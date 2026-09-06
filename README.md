@@ -1,4 +1,4 @@
-# Inductive Bible Study Canvas
+# Inductive Bible Study Canvas 
 
 "Figma for inductive Bible study": a fully client-side canvas for manuscript
 work. Load a passage, mark it up on an infinite board, work the four movements of
