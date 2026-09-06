@@ -20,8 +20,7 @@ Scroll to zoom at the cursor, shift-scroll to pan, hold space to drag the board.
 **The scripture layer.** Fetch any passage in modern translations (NIV, ESV,
 NASB, NKJV, NLT, AMP, MSG, RSV) or public-domain ones (WEB, KJV, ASV, YLT and
 more), or paste your own text. Flip on *Parallel* to set two translations side by
-side. Every word is laid out and measured individually, so clicking one opens its
-Greek or Hebrew entry — lemma, transliteration, Strong's number, gloss. Typography
+side. Every word is laid out and measured individually for phrase selection and annotations. Typography
 is fully adjustable: family, size, line height, letter and word spacing, verse
 spacing, column width.
 
@@ -172,29 +171,20 @@ src/
     urlState.js           native gzip/Base64URL, legacy decoding, local drafts
     exporters.js          PNG and PDF output
   data/
-    strongs.js            bundled lexicon (see below)
     books.js              canonical book table and reference parser
     prompts.js · tags.js · translations.js
 ```
 
-Three design decisions worth knowing about:
+Two design decisions worth knowing about:
 
 **Words are laid out by hand.** Konva can wrap a paragraph, but then no word has
-an identity — you couldn't click one for its lemma or point an arrow at verse 3.
+an identity — you couldn't select a phrase or point an arrow at verse 3.
 So `textLayout.js` measures each word with a 2D context using the exact font
 string Konva will render with, and emits positioned words plus per-verse geometry
 (including one rect per rendered line, which is what a highlight traces).
 Because that measuring happens in JS while the painting happens later, layout is
 re-run once `document.fonts` reports the real faces have loaded (`useFonts.js`) —
 otherwise words are spaced for the fallback font and run into each other.
-
-**The Strong's lexicon is a curated slice.** The full dataset is ~14k entries and
-several megabytes, which is a poor trade for a static app. `src/data/strongs.js`
-ships the vocabulary that actually carries inductive study — theological terms,
-connectives, repeated words — indexed by English headword with stemming and
-aliases, so one click shows every original-language word behind that English one.
-Unknown words say so rather than guessing. Swap in a full Strong's JSON by
-replacing `LEXICON` with the same shape; nothing else changes.
 
 **Section headings are stripped heuristically.** bolls.life marks both section
 headings and poetic line breaks with `<br/>`. A leading segment is dropped only

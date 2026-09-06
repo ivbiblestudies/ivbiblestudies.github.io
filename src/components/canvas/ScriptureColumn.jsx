@@ -1,5 +1,5 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
-import { Group, Text, Rect, Line } from 'react-konva'
+import { Group, Text, Line } from 'react-konva'
 import { fontStack } from '../../lib/textLayout'
 
 const TILE_HEIGHT = 640
@@ -24,7 +24,7 @@ const WordTile = memo(function WordTile({ words, top, style, visible, ratio, int
   </Group>
 })
 
-function ScriptureColumn({ layout, style, x, y, label, reference, activeWordId,
+function ScriptureColumn({ layout, style, x, y, label, reference,
   onWordClick, onWordHover, selectingWords = false, interactive = true, viewport, bounds }) {
   const handlers = useRef(null)
   handlers.current = { onWordClick, onWordHover, selectingWords }
@@ -32,7 +32,7 @@ function ScriptureColumn({ layout, style, x, y, label, reference, activeWordId,
   const hover = useCallback((w, e) => {
     handlers.current.onWordHover?.(w)
     const container = e.target.getStage()?.container()
-    if (container) container.style.cursor = handlers.current.selectingWords ? 'text' : 'help'
+    if (container) container.style.cursor = handlers.current.selectingWords ? 'text' : ''
   }, [])
   const leave = useCallback(e => {
     const container = e.target.getStage()?.container()
@@ -47,7 +47,6 @@ function ScriptureColumn({ layout, style, x, y, label, reference, activeWordId,
     }
     return [...rows].map(([top, words]) => ({ top, words }))
   }, [layout])
-  const active = layout.words.find(w => activeWordId === `${label}:${w.id}`)
   const scale = viewport?.scale || 1
   const ratio = Math.min(3, Math.max(1, Math.ceil(scale * (window.devicePixelRatio || 1))))
   const viewTop = viewport ? -viewport.y / scale - y : -Infinity
@@ -60,8 +59,6 @@ function ScriptureColumn({ layout, style, x, y, label, reference, activeWordId,
     <Text text={label || ''} x={0} y={-40} fontSize={14} fontFamily="Inter, sans-serif"
       fontStyle="500" fill="#57534e" listening={false} />
     <Line points={[0, -18, layout.width, -18]} stroke="#e7e5e4" strokeWidth={1} listening={false} />
-    {active && <Rect x={active.x - 2} y={active.y - 2} width={active.w + 4} height={active.h + 4}
-      fill="#fde68a" opacity={0.85} cornerRadius={3} listening={false} />}
     {tiles.map(tile => <WordTile key={tile.top} {...tile} style={style} ratio={ratio} interactive={interactive}
       visible={columnVisible && tile.top + TILE_HEIGHT + style.fontSize * 2 >= viewTop - 160 && tile.top <= viewBottom + 160}
       onClick={click} onHover={hover} onLeave={leave} />)}

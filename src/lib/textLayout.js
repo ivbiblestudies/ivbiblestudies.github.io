@@ -1,8 +1,8 @@
 // Word-level layout for the scripture layer.
 //
 // Konva can wrap text for us, but then every word is anonymous: we could not
-// tell which pixel belongs to which word, so clicking a word for its Strong's
-// entry and anchoring an arrow to "verse 3" would both be impossible. So we lay
+// tell which pixel belongs to which word for phrase selection and verse
+// annotations. So we lay
 // the passage out ourselves, one measured word at a time, and render each word
 // as its own node. That gives us per-word hit testing and per-verse geometry for
 // free.

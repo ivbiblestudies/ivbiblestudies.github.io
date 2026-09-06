@@ -72,7 +72,6 @@ export const emptyDoc = () => ({
     tagFilter: ['observation', 'question', 'application', 'none'],
     viewport: { x: 0, y: 0, scale: 1 },
     showGrid: true,
-    showStrongs: true,
   },
 })
 
@@ -157,7 +156,6 @@ export const useStudy = create((set, get) => {
     loading: null, // 'primary' | 'secondary' | null
     error: null,
     notice: null,
-    strongs: null, // { word, headword, entries, screenX, screenY }
     settingsOpen: false,
     exportOpen: false,
     shareOpen: false,
@@ -200,15 +198,13 @@ export const useStudy = create((set, get) => {
     setUI: (patch, opts) => commit((s) => ({ ui: { ...s.ui, ...patch } }), opts),
     setTool: (tool) => commit((s) => ({ ui: { ...s.ui, tool } }), { history: false }),
     setColor: (color) => commit((s) => ({ ui: { ...s.ui, color } }), { history: false }),
-    // Panning or zooming detaches the Strong's popover from its word, so it goes.
     setViewport: (viewport) =>
-      commit((s) => ({ ui: { ...s.ui, viewport }, strongs: null }), { history: false }),
-    setSelected: (selectedId) => set({ selectedId, strongs: null }),
+      commit((s) => ({ ui: { ...s.ui, viewport } }), { history: false }),
+    setSelected: (selectedId) => set({ selectedId }),
     setEditing: (editingId) => set({ editingId }),
-    setStrongs: (strongs) => set({ strongs }),
     setNotice: (notice) => set({ notice }),
     setError: (error) => set({ error }),
-    openSettings: (settingsOpen = true) => set({ settingsOpen, strongs: null }),
+    openSettings: (settingsOpen = true) => set({ settingsOpen }),
     openExport: (exportOpen = true) => set({ exportOpen }),
     openShare: (shareOpen = true) => set({ shareOpen }),
 

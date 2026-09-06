@@ -9,13 +9,11 @@ import { inViewport, canvasSize } from '../../lib/viewport'
 import { publishLayout } from '../../lib/layoutRegistry'
 import { registerCanvasApi } from '../../lib/canvasApi'
 import { useFontEpoch } from '../../lib/useFonts'
-import { lookupStrongs } from '../../data/strongs'
 import { translationShort } from '../../data/translations'
 import { noteWidth, noteHeight } from '../../lib/noteMetrics'
 import { resolveTag } from '../../data/tags'
 import ScriptureColumn from './ScriptureColumn'
 import Toolbar from './Toolbar'
-import StrongsTooltip from './StrongsTooltip'
 import SelectionPopover from './SelectionPopover'
 import CanvasTextEditor from './CanvasTextEditor'
 import ZoomControls from './ZoomControls'
@@ -69,7 +67,6 @@ export default function CanvasStage() {
   const connectors = useStudy((s) => s.connectors)
   const customTags = useStudy((s) => s.tags)
   const selectedId = useStudy((s) => s.selectedId)
-  const strongsKey = useStudy((s) => s.strongs?.key || null)
 
   const setViewport = useStudy((s) => s.setViewport)
   const wheelUpdates = useMemo(() => frameUpdate((next) => {
@@ -81,7 +78,6 @@ export default function CanvasStage() {
   useEffect(() => () => panUpdates.cancel(), [panUpdates])
   const setSelected = useStudy((s) => s.setSelected)
   const setEditing = useStudy((s) => s.setEditing)
-  const setStrongs = useStudy((s) => s.setStrongs)
   const setTool = useStudy((s) => s.setTool)
   const addShape = useStudy((s) => s.addShape)
   const updateShape = useStudy((s) => s.updateShape)
@@ -357,7 +353,6 @@ export default function CanvasStage() {
       }
       if (tool === 'select' && isBackground(e) && !wordSelection) {
         setSelected(null)
-        setStrongs(null)
       }
       return
     }
@@ -598,7 +593,7 @@ export default function CanvasStage() {
   }, [selectedId, shapes, columns])
 
   // --- word clicks ---------------------------------------------------------
-  const handleWordClick = (word, columnLabel, colIndex, evt) => {
+  const handleWordClick = (word, colIndex, evt) => {
     if (tool !== 'select') return
     evt.cancelBubble = true
     if (panRef.current?.spaceHeld) return
@@ -619,21 +614,6 @@ export default function CanvasStage() {
       }
       return
     }
-    if (!ui.showStrongs) return
-    const result = lookupStrongs(word.text)
-    const box = containerRef.current?.getBoundingClientRect()
-    const clientX = evt.evt?.clientX ?? 0
-    const clientY = evt.evt?.clientY ?? 0
-    setStrongs({
-      key: `${columnLabel}:${word.id}`,
-      word: word.text,
-      verse: word.verse,
-      found: !!result,
-      headword: result?.headword,
-      entries: result?.entries || [],
-      x: clientX - (box?.left || 0),
-      y: clientY - (box?.top || 0),
-    })
   }
 
   // --- connectors ----------------------------------------------------------
@@ -760,13 +740,12 @@ export default function CanvasStage() {
                 viewport={vp}
                 bounds={size}
                 interactive={tool === 'select'}
-                activeWordId={strongsKey}
                 selectingWords={!!wordSelection}
                 onWordHover={(word) => {
                   if (!previewRange || previewRange.column !== i || previewRange.verseIndex !== word.verseIndex) return
                   setWordSelection((current) => current && ({ ...current, range: { ...current.range, endWord: word.wordIndex } }))
                 }}
-                onWordClick={(w, evt) => handleWordClick(w, col.label, i, evt)}
+                onWordClick={(w, evt) => handleWordClick(w, i, evt)}
               />
             ))}
 
@@ -900,7 +879,6 @@ export default function CanvasStage() {
       <ZoomControls scale={vp.scale} onZoom={zoomBy} onFit={() => fitToContent()} />
       {!wordSelection && <SelectionPopover bounds={size} onSelectWords={(noteId) => {
         setTool('select')
-        setStrongs(null)
         panRef.current = null
         setWordSelection({ noteId, range: null })
       }} />}
@@ -914,7 +892,6 @@ export default function CanvasStage() {
           <button type="button" className="rounded-lg px-2 py-2 font-semibold hover:bg-stone-100" onClick={() => setWordSelection(null)}>Cancel</button>
         </div>
       )}
-      <StrongsTooltip bounds={size} />
       <CanvasTextEditor />
     </div>
   )

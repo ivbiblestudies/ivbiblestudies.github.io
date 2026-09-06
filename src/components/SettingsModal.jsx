@@ -320,12 +320,6 @@ export default function SettingsModal() {
             label="Dot grid"
             description="Subtle alignment guide behind the canvas."
           />
-          <Toggle
-            checked={ui.showStrongs}
-            onChange={(showStrongs) => setUI({ showStrongs })}
-            label="Original-language lookup"
-            description="Click any word in the text to open its Greek or Hebrew entry."
-          />
           <Divider label="Layout" />
           <div className="grid grid-cols-2 gap-4">
             <Range
