@@ -55,6 +55,7 @@ export default function CanvasStage() {
   const [hoveredNoteId, setHoveredNoteId] = useState(null)
   const [hoveredHighlightNotes, setHoveredHighlightNotes] = useState([])
   const panRef = useRef(null)
+  const nativeDragActive = useRef(false)
   const wheelPending = useRef(null)
 
   const scripture = useStudy((s) => s.scripture)
@@ -474,6 +475,45 @@ export default function CanvasStage() {
     setTool('select')
   }
 
+  // A release outside the browser or a cancelled touch may never reach Konva.
+  // Its stale drag state suppresses hit testing until explicitly stopped.
+  useEffect(() => {
+    const finishInterruptedGesture = (clearSpace = false) => {
+      const stage = stageRef.current
+      if (!stage) return
+      stage.find(node => node.isDragging()).forEach(node => node.stopDrag())
+      nativeDragActive.current = false
+      panUpdates.flush()
+      noteDragUpdates.flush()
+      wheelUpdates.flush()
+      panRef.current = { ...panRef.current, active: false,
+        spaceHeld: clearSpace ? false : !!panRef.current?.spaceHeld }
+      setDraft(null)
+      setHoveredNoteId(null)
+      setHoveredHighlightNotes([])
+      if (containerRef.current) containerRef.current.style.cursor = ''
+      stage.batchDraw()
+    }
+    const interrupt = () => finishInterruptedGesture(true)
+    const recover = event => {
+      if (event.pointerType === 'touch' || event.buttons !== 0) return
+      if (panRef.current?.active || nativeDragActive.current) {
+        finishInterruptedGesture()
+      }
+    }
+    const hidden = () => { if (document.visibilityState === 'hidden') interrupt() }
+    window.addEventListener('blur', interrupt)
+    window.addEventListener('pointercancel', interrupt)
+    window.addEventListener('pointermove', recover)
+    document.addEventListener('visibilitychange', hidden)
+    return () => {
+      window.removeEventListener('blur', interrupt)
+      window.removeEventListener('pointercancel', interrupt)
+      window.removeEventListener('pointermove', recover)
+      document.removeEventListener('visibilitychange', hidden)
+    }
+  }, [panUpdates, noteDragUpdates, wheelUpdates])
+
   const onWheel = (e) => {
     e.evt.preventDefault()
     const stage = stageRef.current
@@ -671,6 +711,8 @@ export default function CanvasStage() {
         width={size.width}
         height={size.height}
         onMouseDown={onPointerDown}
+        onDragStart={() => { nativeDragActive.current = true }}
+        onDragEnd={() => { nativeDragActive.current = false }}
         onTouchStart={onPointerDown}
         onMouseMove={onPointerMove}
         onTouchMove={onPointerMove}
