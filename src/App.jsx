@@ -76,14 +76,28 @@ export default function App() {
     // Share one decode promise across StrictMode's effect setup/cleanup cycle.
     if (!initialSnapshot.current) initialSnapshot.current = readStateFromLocation()
     let warned = false
-    const save = (state, previous) => {
-      const doc = pickDoc(state)
-      if (previous && Object.keys(doc).every((key) => state[key] === previous[key])) return
-      if (!saveLocalDraft(doc) && !warned) {
+    let saveTimer
+    let pendingState
+    const flushSave = () => {
+      clearTimeout(saveTimer)
+      if (!pendingState) return
+      const state = pendingState
+      pendingState = null
+      if (!saveLocalDraft(pickDoc(state)) && !warned) {
         warned = true
         state.setNotice('Browser storage is unavailable or full. Copy a share link before leaving to keep this study.')
       }
     }
+    const save = (state, previous) => {
+      const doc = pickDoc(state)
+      if (previous && Object.keys(doc).every((key) => state[key] === previous[key])) return
+      pendingState = state
+      clearTimeout(saveTimer)
+      saveTimer = setTimeout(flushSave, 400)
+    }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flushSave() }
+    window.addEventListener('pagehide', flushSave)
+    document.addEventListener('visibilitychange', onVisibility)
     initialSnapshot.current.then((shared) => {
       if (cancelled) return
       const hadSharedPayload = new URLSearchParams(window.location.hash.slice(1)).has('s') ||
@@ -98,7 +112,13 @@ export default function App() {
       unsubscribe = useStudy.subscribe(save)
       setHydrated(true)
     })
-    return () => { cancelled = true; unsubscribe?.() }
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+      flushSave()
+      window.removeEventListener('pagehide', flushSave)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [loadDoc])
 
   // Global shortcuts.

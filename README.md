@@ -106,6 +106,13 @@ remove the local draft; copying the base URL alone does not share your study.
 
 ### Keyboard
 
+For larger studies, scripture is cached in visible canvas tiles; offscreen tiles
+release their buffers. Panning updates at most once per animation frame, and
+draft writes wait for 400 ms of inactivity (flushing when the page is hidden or
+left). Note shadows appear only on selected or hovered notes. Exports still render
+the full passage at export resolution. These optimizations apply across browsers,
+including Firefox.
+
 | | |
 |---|---|
 | `V` `H` `B` `G` `A` `T` `N` | select, pan, box, highlighter, arrow, text, note |

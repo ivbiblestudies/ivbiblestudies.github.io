@@ -4,6 +4,8 @@ import { useShallow } from 'zustand/shallow'
 import { useStudy, visibleNotes, visibleShapes } from '../../store'
 import { layoutPassage, connectorBox } from '../../lib/textLayout'
 import { highlightNotesAt } from '../../lib/connections'
+import { frameUpdate } from '../../lib/frameUpdate'
+import { inViewport } from '../../lib/viewport'
 import { publishLayout } from '../../lib/layoutRegistry'
 import { registerCanvasApi } from '../../lib/canvasApi'
 import { useFontEpoch } from '../../lib/useFonts'
@@ -53,6 +55,7 @@ export default function CanvasStage() {
   const [hoveredNoteId, setHoveredNoteId] = useState(null)
   const [hoveredHighlightNotes, setHoveredHighlightNotes] = useState([])
   const panRef = useRef(null)
+  const wheelPending = useRef(null)
 
   const scripture = useStudy((s) => s.scripture)
   const style = useStudy((s) => s.style)
@@ -66,6 +69,13 @@ export default function CanvasStage() {
   const strongsKey = useStudy((s) => s.strongs?.key || null)
 
   const setViewport = useStudy((s) => s.setViewport)
+  const wheelUpdates = useMemo(() => frameUpdate((next) => {
+    wheelPending.current = null
+    setViewport(next)
+  }), [setViewport])
+  useEffect(() => () => wheelUpdates.cancel(), [wheelUpdates])
+  const panUpdates = useMemo(() => frameUpdate(setViewport), [setViewport])
+  useEffect(() => () => panUpdates.cancel(), [panUpdates])
   const setSelected = useStudy((s) => s.setSelected)
   const setEditing = useStudy((s) => s.setEditing)
   const setStrongs = useStudy((s) => s.setStrongs)
@@ -74,6 +84,15 @@ export default function CanvasStage() {
   const updateShape = useStudy((s) => s.updateShape)
   const addNote = useStudy((s) => s.addNote)
   const updateNote = useStudy((s) => s.updateNote)
+  const noteDragUpdates = useMemo(() => frameUpdate(({ id, x, y }) => {
+    updateNote(id, { x, y }, { history: false })
+  }), [updateNote])
+  useEffect(() => () => noteDragUpdates.cancel(), [noteDragUpdates])
+  const moveNote = useCallback((id, x, y) => noteDragUpdates.push({ id, x, y }), [noteDragUpdates])
+  const finishNoteDrag = useCallback((id, x, y) => {
+    noteDragUpdates.cancel()
+    updateNote(id, { x, y })
+  }, [noteDragUpdates, updateNote])
   const setConnectorRange = useStudy((s) => s.setConnectorRange)
 
   const vp = ui.viewport
@@ -255,8 +274,18 @@ export default function CanvasStage() {
       dots.fillPatternY(-b.y + padding)
       dots.fillPatternScale({ x: 1, y: 1 })
 
-      stage.draw()
-      const dataUrl = stage.toDataURL({ pixelRatio, mimeType: 'image/png' })
+      // Export all text at the requested resolution, including offscreen tiles.
+      const tiles = [...stage.find('.scripture-tile'), ...stage.find('.note')].map(node => ({ node, visible: node.visible(), cached: node.isCached() }))
+      let dataUrl
+      try {
+        tiles.forEach(({ node }) => { node.visible(true); node.clearCache() })
+        stage.draw()
+        dataUrl = stage.toDataURL({ pixelRatio, mimeType: 'image/png' })
+      } finally {
+        tiles.forEach(({ node, visible, cached }) => {
+          node.visible(visible)
+          if (cached) node.cache({ pixelRatio: node.getAttr('cacheRatio'), hitCanvasPixelRatio: 1, offset: 4 })
+        })
 
       // Put everything back exactly as it was.
       stage.size({ width: prev.width, height: prev.height })
@@ -271,6 +300,7 @@ export default function CanvasStage() {
       dots.fillPatternScale({ x: vp.scale, y: vp.scale })
       tr?.nodes(prevNodes)
       stage.draw()
+      }
 
       return { dataUrl, width, height }
     },
@@ -305,6 +335,7 @@ export default function CanvasStage() {
     const stage = stageRef.current
     const pos = stage.getPointerPosition()
     if (!pos) return
+
     const world = toWorld(pos)
 
     // Middle mouse and space-drag always pan, whatever the tool.
@@ -377,18 +408,18 @@ export default function CanvasStage() {
     const pos = stage?.getPointerPosition()
     if (!pos) return
 
-    const hitNotes = tool === 'select' && !wordSelection && !event?.target?.findAncestor('.note', true)
-      ? highlightNotesAt(connectorLines, toWorld(pos)) : []
-    setHoveredHighlightNotes((previous) => previous.length === hitNotes.length && previous.every((id, i) => id === hitNotes[i]) ? previous : hitNotes)
-
     if (panRef.current?.active) {
       const p = panRef.current
       const dx = pos.x - p.startX
       const dy = pos.y - p.startY
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) p.moved = true
-      setViewport({ ...vp, x: p.originX + dx, y: p.originY + dy })
+      panUpdates.push({ ...vp, x: p.originX + dx, y: p.originY + dy })
       return
     }
+
+    const hitNotes = tool === 'select' && !wordSelection && !event?.target?.findAncestor('.note', true)
+      ? highlightNotesAt(connectorLines, toWorld(pos)) : []
+    setHoveredHighlightNotes((previous) => previous.length === hitNotes.length && previous.every((id, i) => id === hitNotes[i]) ? previous : hitNotes)
 
     if (draft) {
       const world = toWorld(pos)
@@ -398,6 +429,7 @@ export default function CanvasStage() {
 
   const onPointerUp = () => {
     if (panRef.current?.active) {
+      panUpdates.flush()
       panRef.current = { ...panRef.current, active: false }
       return
     }
@@ -448,9 +480,16 @@ export default function CanvasStage() {
     const pos = stage.getPointerPosition()
     if (!pos) return
 
+    // Accumulate every wheel delta but reconcile the scene only once per frame.
+    const current = wheelPending.current || useStudy.getState().ui.viewport
+    const queueViewport = (next) => {
+      wheelPending.current = next
+      wheelUpdates.push(next)
+    }
+
     // Scrolling zooms, anchored on the cursor — hold shift to pan instead.
     if (e.evt.shiftKey) {
-      setViewport({ ...vp, x: vp.x - e.evt.deltaX, y: vp.y - e.evt.deltaY })
+      queueViewport({ ...current, x: current.x - e.evt.deltaX, y: current.y - e.evt.deltaY })
       return
     }
 
@@ -458,12 +497,12 @@ export default function CanvasStage() {
     // continuous) and page/line delta modes, so one notch is one step.
     const unit = e.evt.deltaMode === 1 ? 16 : e.evt.deltaMode === 2 ? 400 : 1
     const delta = Math.max(-240, Math.min(240, e.evt.deltaY * unit))
-    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, vp.scale * Math.exp(-delta * 0.0015)))
-    if (next === vp.scale) return
+    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * Math.exp(-delta * 0.0015)))
+    if (next === current.scale) return
 
-    const wx = (pos.x - vp.x) / vp.scale
-    const wy = (pos.y - vp.y) / vp.scale
-    setViewport({ scale: next, x: pos.x - wx * next, y: pos.y - wy * next })
+    const wx = (pos.x - current.x) / current.scale
+    const wy = (pos.y - current.y) / current.scale
+    queueViewport({ scale: next, x: pos.x - wx * next, y: pos.y - wy * next })
   }
 
   // Space-to-pan, the way every canvas tool works.
@@ -674,6 +713,8 @@ export default function CanvasStage() {
                 y={layer.y}
                 label={col.label}
                 reference={col.reference}
+                viewport={vp}
+                bounds={size}
                 interactive={tool === 'select'}
                 activeWordId={strongsKey}
                 selectingWords={!!wordSelection}
@@ -753,11 +794,12 @@ export default function CanvasStage() {
                 customTags={customTags}
                 fontEpoch={fontEpoch}
                 selected={selectedId === note.id}
+                visible={selectedId === note.id || inViewport(note.x, note.y, noteWidth(note), noteHeight(note), vp, size)}
                 connectionHovered={activeConnectionNotes.has(note.id)}
                 onHover={setHoveredNoteId}
                 onSelect={setSelected}
-                onDragMove={(id, x, y) => updateNote(id, { x, y }, { history: false })}
-                onDragEnd={(id, x, y) => updateNote(id, { x, y })}
+                onDragMove={moveNote}
+                onDragEnd={finishNoteDrag}
                 onResize={resizeNote}
                 onEdit={setEditing}
               />

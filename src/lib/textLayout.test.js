@@ -2,7 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as layout from './textLayout.js'
 
-globalThis.document = { createElement: () => ({ getContext: () => ({ measureText: (text) => ({ width: text.length * 9 }) }) }) }
+let measureCalls = 0
+globalThis.document = { createElement: () => ({ getContext: () => ({ measureText: (text) => { measureCalls++; return { width: text.length * 9 } } }) }) }
+
+test('repeated words are measured once per layout, with fresh measurements on reflow', () => {
+  measureCalls = 0
+  const verses = [{ verse: 1, text: Array(100).fill('Word').join(' ') }]
+  layout.layoutPassage(verses, { showVerseNumbers: false })
+  assert.equal(measureCalls, 2)
+  layout.layoutPassage(verses, { showVerseNumbers: false })
+  assert.equal(measureCalls, 4)
+})
 
 test('phrase geometry selects only chosen words across wrapped lines, in either direction', () => {
   assert.equal(typeof layout.connectorBox, 'function')

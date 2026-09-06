@@ -49,6 +49,13 @@ function measure(text, style, weight) {
  */
 export function layoutPassage(verses, style) {
   const s = { ...DEFAULT_STYLE, ...style }
+  // Cache only within this layout pass so newly loaded fonts cannot leave stale widths.
+  const measured = new Map()
+  const measureWord = (text, style, weight) => {
+    const key = `${weight}:${style.fontSize}:${text}`
+    if (!measured.has(key)) measured.set(key, measure(text, style, weight))
+    return measured.get(key)
+  }
   const width = s.columnWidth
   const lineStep = s.fontSize * s.lineHeight
   const space = measure(' ', s, 400) + s.wordSpacing
@@ -104,8 +111,8 @@ export function layoutPassage(verses, style) {
       const weight = tok.isVerseNum ? 600 : 400
       const size = tok.isVerseNum ? Math.round(s.fontSize * 0.62) : s.fontSize
       const w = tok.isVerseNum
-        ? measure(tok.text, { ...s, fontSize: size }, weight)
-        : measure(tok.text, s, weight)
+        ? measureWord(tok.text, { ...s, fontSize: size }, weight)
+        : measureWord(tok.text, s, weight)
 
       if (x > 0 && x + w > width) newline()
 

@@ -32,6 +32,7 @@ function NoteNode({
   customTags,
   fontEpoch,
   selected,
+  visible = true,
   connectionHovered = false,
   onHover,
   onSelect,
@@ -102,6 +103,7 @@ function NoteNode({
     <Group
       id={note.id}
       name="note"
+      visible={visible}
       x={note.x}
       y={note.y}
       draggable
@@ -132,6 +134,8 @@ function NoteNode({
         strokeWidth={connectionHovered ? 3 : selected ? 2 : 1}
         cornerRadius={6}
         shadowColor={connectionHovered ? tag.hex : '#1c1917'}
+        shadowEnabled={selected || connectionHovered}
+        shadowForStrokeEnabled={false}
         shadowOpacity={connectionHovered ? 0.35 : selected ? 0.16 : 0.08}
         shadowBlur={connectionHovered ? 20 : selected ? 14 : 8}
         shadowOffsetY={selected ? 4 : 2}
