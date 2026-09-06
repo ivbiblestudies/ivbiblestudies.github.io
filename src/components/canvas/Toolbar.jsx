@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStudy } from '../../store'
 import { tagList, resolveTag, TAG_PALETTE } from '../../data/tags'
 import { cx } from '../ui'
+import MovablePanel from '../MovablePanel'
 import {
   IconCursor,
   IconHand,
@@ -67,6 +68,7 @@ function Flyout({ open, onClose, children, label }) {
  * floating over the bottom, so it is always on screen at any window size.
  */
 export default function Toolbar() {
+  const hidden = useStudy((s) => s.ui.toolsHidden)
   const tool = useStudy((s) => s.ui.tool)
   const color = useStudy((s) => s.ui.color)
   const noteTag = useStudy((s) => s.ui.noteTag)
@@ -83,7 +85,7 @@ export default function Toolbar() {
   const activeTag = resolveTag(noteTag, customTags)
 
   return (
-    <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-3">
+    <MovablePanel label="Tools" hidden={hidden} width={58} onHide={() => setUI({ toolsHidden: true }, { history: false })}>
       <div className="pointer-events-auto relative flex flex-col items-center gap-1 rounded-2xl border border-stone-200/90 bg-white/95 p-1.5 shadow-xl shadow-stone-900/10 backdrop-blur">
         {TOOLS.map(({ id, label, key, Icon }) => (
           <button
@@ -293,6 +295,6 @@ export default function Toolbar() {
           </Flyout>
         </div>
       </div>
-    </div>
+    </MovablePanel>
   )
 }

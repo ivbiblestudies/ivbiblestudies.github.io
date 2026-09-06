@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal'
 import ExportModal from './components/ExportModal'
 import ShareModal from './components/ShareModal'
 import { cx } from './components/ui'
+import MovablePanel from './components/MovablePanel'
 
 const TOOL_KEYS = {
   v: 'select',
@@ -58,6 +59,9 @@ function Toast() {
 }
 
 export default function App() {
+  const toolsHidden = useStudy((s) => !!s.ui.toolsHidden)
+  const studyHidden = useStudy((s) => !!s.ui.studyHidden)
+  const setUI = useStudy((s) => s.setUI)
   const loadDoc = useStudy((s) => s.loadDoc)
   const undo = useStudy((s) => s.undo)
   const redo = useStudy((s) => s.redo)
@@ -164,17 +168,21 @@ export default function App() {
   return (
     <div className="flex h-full flex-col bg-stone-100">
       <TopBar />
+      <div className="flex shrink-0 items-center justify-between border-b border-stone-200 bg-white px-3 py-1">
+        <button type="button" aria-expanded={!toolsHidden} className="rounded px-2 py-1 text-xs text-stone-600 hover:bg-stone-100" onClick={() => setUI({ toolsHidden: !toolsHidden }, { history: false })}>{toolsHidden ? 'Show tools' : 'Hide tools'}</button>
+        <button type="button" aria-expanded={!studyHidden} className="rounded px-2 py-1 text-xs text-stone-600 hover:bg-stone-100" onClick={() => setUI({ studyHidden: !studyHidden }, { history: false })}>{studyHidden ? 'Show study panel' : 'Hide study panel'}</button>
+      </div>
 
-      <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <main className="relative flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* 70 / 30 split: the manuscript gets the room, the method gets the margin.
             The sidebar owns the 30% and its own minimum; the canvas takes whatever
             is left, so a narrow window never forces the page to scroll sideways. */}
-        <div className="relative min-h-[52vh] min-w-0 flex-1 lg:min-h-0">
+        <div className={`relative min-w-0 flex-1 ${studyHidden ? 'min-h-0' : 'min-h-[45vh] lg:min-h-0'}`}>
           <CanvasStage />
         </div>
-        <div className="min-h-0 flex-1 lg:w-[30%] lg:min-w-[320px] lg:max-w-[520px] lg:flex-none">
+        <MovablePanel label="Study panel" docked hidden={studyHidden} width={380} resizable onHide={() => setUI({ studyHidden: true }, { history: false })}>
           <Sidebar />
-        </div>
+        </MovablePanel>
       </main>
 
       <SettingsModal />

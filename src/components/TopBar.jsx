@@ -34,7 +34,7 @@ export default function TopBar() {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-stone-200 bg-white px-3 sm:px-4">
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200 bg-white px-2 sm:gap-3 sm:px-4">
       <Button
         variant="default"
         size="sm"
