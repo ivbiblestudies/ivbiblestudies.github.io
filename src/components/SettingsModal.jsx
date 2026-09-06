@@ -157,12 +157,12 @@ export default function SettingsModal() {
       {tab === 'scripture' && (
         <div className="space-y-4">
           <div className="flex items-end gap-2">
-            <Field label="Passage reference" className="flex-1" hint="e.g. John 1:1-14, Romans 8, Ps 23">
+            <Field label="Passage reference" className="flex-1" hint="e.g. Luke 7:1-10, Romans 8, Ps 23">
               <Input
                 value={scripture.reference}
                 onChange={(e) => setReference(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && loadPassage('primary')}
-                placeholder="John 1:1-14"
+                placeholder="Luke 7:1-10"
               />
             </Field>
             <Button variant="primary" onClick={() => loadPassage('primary')}>
