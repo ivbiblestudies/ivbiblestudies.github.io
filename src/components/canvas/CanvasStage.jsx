@@ -1,0 +1,756 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Stage, Layer, Group, Rect, Arrow, Line, Transformer } from 'react-konva'
+import { useShallow } from 'zustand/shallow'
+import { useStudy, visibleNotes, visibleShapes } from '../../store'
+import { layoutPassage } from '../../lib/textLayout'
+import { publishLayout } from '../../lib/layoutRegistry'
+import { registerCanvasApi } from '../../lib/canvasApi'
+import { useFontEpoch } from '../../lib/useFonts'
+import { lookupStrongs } from '../../data/strongs'
+import { translationShort } from '../../data/translations'
+import { noteWidth, noteHeight } from '../../lib/noteMetrics'
+import { resolveTag } from '../../data/tags'
+import ScriptureColumn from './ScriptureColumn'
+import Toolbar from './Toolbar'
+import StrongsTooltip from './StrongsTooltip'
+import SelectionPopover from './SelectionPopover'
+import CanvasTextEditor from './CanvasTextEditor'
+import ZoomControls from './ZoomControls'
+import NoteNode from './NoteNode'
+import ShapeNode from './ShapeNode'
+
+const MIN_SCALE = 0.15
+const MAX_SCALE = 4
+const GRID = 26
+
+function dotPattern() {
+  const c = document.createElement('canvas')
+  c.width = GRID
+  c.height = GRID
+  const g = c.getContext('2d')
+  g.fillStyle = '#d3cec6'
+  g.beginPath()
+  g.arc(1.5, 1.5, 1.2, 0, Math.PI * 2)
+  g.fill()
+  return c
+}
+
+const DRAW_TOOLS = new Set(['box', 'highlight', 'arrow'])
+const CLICK_TOOLS = new Set(['text', 'note'])
+
+export default function CanvasStage() {
+  const containerRef = useRef(null)
+  const stageRef = useRef(null)
+  const trRef = useRef(null)
+  const bgBaseRef = useRef(null)
+  const bgDotsRef = useRef(null)
+  const pattern = useMemo(() => dotPattern(), [])
+
+  const [size, setSize] = useState({ width: 0, height: 0 })
+  const [draft, setDraft] = useState(null)
+  const panRef = useRef(null)
+
+  const scripture = useStudy((s) => s.scripture)
+  const style = useStudy((s) => s.style)
+  const layer = useStudy((s) => s.layer)
+  const ui = useStudy((s) => s.ui)
+  const notes = useStudy(useShallow(visibleNotes))
+  const shapes = useStudy(useShallow(visibleShapes))
+  const connectors = useStudy((s) => s.connectors)
+  const customTags = useStudy((s) => s.tags)
+  const selectedId = useStudy((s) => s.selectedId)
+  const strongsKey = useStudy((s) => s.strongs?.key || null)
+
+  const setViewport = useStudy((s) => s.setViewport)
+  const setSelected = useStudy((s) => s.setSelected)
+  const setEditing = useStudy((s) => s.setEditing)
+  const setStrongs = useStudy((s) => s.setStrongs)
+  const setTool = useStudy((s) => s.setTool)
+  const addShape = useStudy((s) => s.addShape)
+  const updateShape = useStudy((s) => s.updateShape)
+  const addNote = useStudy((s) => s.addNote)
+  const updateNote = useStudy((s) => s.updateNote)
+
+  const vp = ui.viewport
+  const tool = ui.tool
+
+  // Re-measure the passage and the notes once the webfonts are really loaded.
+  const fontEpoch = useFontEpoch([style.fontFamily, 'Inter'])
+
+  // --- passage layout ---------------------------------------------------
+  const columns = useMemo(() => {
+    const cols = []
+    const primary = scripture.primary
+    if (primary.verses?.length) {
+      cols.push({
+        slot: 'primary',
+        layout: layoutPassage(primary.verses, style),
+        label: primary.loadedTranslation || translationShort(primary.translation),
+        reference: primary.loadedReference || scripture.reference,
+      })
+    }
+    if (scripture.parallel && scripture.secondary.verses?.length) {
+      cols.push({
+        slot: 'secondary',
+        layout: layoutPassage(scripture.secondary.verses, style),
+        label:
+          scripture.secondary.loadedTranslation ||
+          translationShort(scripture.secondary.translation),
+        reference: scripture.secondary.loadedReference || scripture.reference,
+      })
+    }
+    return cols
+  }, [scripture, style, fontEpoch])
+
+  const columnX = useCallback(
+    (i) => layer.x + i * (style.columnWidth + layer.gap),
+    [layer.x, layer.gap, style.columnWidth],
+  )
+
+  useEffect(() => {
+    publishLayout({
+      columns: columns.map((c) => c.layout),
+      origin: { x: layer.x, y: layer.y },
+      gap: layer.gap,
+    })
+  }, [columns, layer])
+
+  // --- sizing -----------------------------------------------------------
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setSize({ width: Math.max(1, width), height: Math.max(1, height) })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // --- coordinate helpers -----------------------------------------------
+  const toWorld = useCallback(
+    (p) => ({ x: (p.x - vp.x) / vp.scale, y: (p.y - vp.y) / vp.scale }),
+    [vp],
+  )
+
+  const contentBounds = useCallback(() => {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    const add = (x, y, w = 0, h = 0) => {
+      minX = Math.min(minX, x, x + w)
+      minY = Math.min(minY, y, y + h)
+      maxX = Math.max(maxX, x, x + w)
+      maxY = Math.max(maxY, y, y + h)
+    }
+
+    columns.forEach((c, i) => add(columnX(i), layer.y - 60, c.layout.width, c.layout.height + 60))
+    notes.forEach((n) => add(n.x, n.y, noteWidth(n), noteHeight(n)))
+    shapes.forEach((s) => {
+      if (s.type === 'arrow') {
+        const pts = s.points || [0, 0, 0, 0]
+        for (let i = 0; i < pts.length; i += 2) add(s.x + pts[i], s.y + pts[i + 1])
+      } else if (s.type === 'text') {
+        add(s.x, s.y, s.width || 220, (s.fontSize || 18) * 1.6)
+      } else {
+        add(s.x, s.y, s.width, s.height)
+      }
+    })
+
+    if (!Number.isFinite(minX)) return { x: 0, y: 0, width: 800, height: 600 }
+    return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) }
+  }, [columns, columnX, layer.y, notes, shapes])
+
+  const fitToContent = useCallback(
+    (padding = 80) => {
+      if (!size.width || !size.height) return
+      const b = contentBounds()
+      const scale = Math.min(
+        MAX_SCALE,
+        Math.max(
+          MIN_SCALE,
+          Math.min(
+            (size.width - padding * 2) / b.width,
+            (size.height - padding * 2) / b.height,
+          ),
+        ),
+      )
+      setViewport({
+        scale,
+        x: size.width / 2 - (b.x + b.width / 2) * scale,
+        y: size.height / 2 - (b.y + b.height / 2) * scale,
+      })
+    },
+    [contentBounds, setViewport, size],
+  )
+
+  const zoomBy = useCallback(
+    (factor) => {
+      const cx = size.width / 2
+      const cy = size.height / 2
+      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, vp.scale * factor))
+      const wx = (cx - vp.x) / vp.scale
+      const wy = (cy - vp.y) / vp.scale
+      setViewport({ scale: next, x: cx - wx * next, y: cy - wy * next })
+    },
+    [size, vp, setViewport],
+  )
+
+  // --- export ------------------------------------------------------------
+  const renderImage = useCallback(
+    ({ pixelRatio = 3, padding = 64, background = true } = {}) => {
+      const stage = stageRef.current
+      if (!stage) return null
+
+      // Selection handles are UI, not artwork — hide them for the render.
+      const tr = trRef.current
+      const prevNodes = tr?.nodes() || []
+      tr?.nodes([])
+
+      const b = contentBounds()
+      const width = Math.ceil(b.width + padding * 2)
+      const height = Math.ceil(b.height + padding * 2)
+
+      const prev = {
+        x: stage.x(),
+        y: stage.y(),
+        width: stage.width(),
+        height: stage.height(),
+      }
+
+      // Render at 1:1 world scale into a stage sized to the content, so the
+      // export is independent of whatever the user is currently zoomed to.
+      stage.size({ width, height })
+      const world = stage.findOne('#world')
+      const worldPrev = { x: world.x(), y: world.y(), scale: world.scaleX() }
+      world.position({ x: -b.x + padding, y: -b.y + padding })
+      world.scale({ x: 1, y: 1 })
+
+      const base = bgBaseRef.current
+      const dots = bgDotsRef.current
+      base.size({ width, height })
+      base.visible(background)
+      dots.size({ width, height })
+      dots.visible(background && ui.showGrid)
+      dots.fillPatternX(-b.x + padding)
+      dots.fillPatternY(-b.y + padding)
+      dots.fillPatternScale({ x: 1, y: 1 })
+
+      stage.draw()
+      const dataUrl = stage.toDataURL({ pixelRatio, mimeType: 'image/png' })
+
+      // Put everything back exactly as it was.
+      stage.size({ width: prev.width, height: prev.height })
+      world.position({ x: worldPrev.x, y: worldPrev.y })
+      world.scale({ x: worldPrev.scale, y: worldPrev.scale })
+      base.size({ width: prev.width, height: prev.height })
+      base.visible(true)
+      dots.size({ width: prev.width, height: prev.height })
+      dots.visible(ui.showGrid)
+      dots.fillPatternX(vp.x)
+      dots.fillPatternY(vp.y)
+      dots.fillPatternScale({ x: vp.scale, y: vp.scale })
+      tr?.nodes(prevNodes)
+      stage.draw()
+
+      return { dataUrl, width, height }
+    },
+    [contentBounds, ui.showGrid, vp],
+  )
+
+  /** Bring a world-space point into the middle of the viewport. */
+  const centerOn = useCallback(
+    (x, y) => {
+      if (!size.width || !size.height) return
+      setViewport({
+        ...vp,
+        x: size.width / 2 - x * vp.scale,
+        y: size.height / 2 - y * vp.scale,
+      })
+    },
+    [size, vp, setViewport],
+  )
+
+  useEffect(() => {
+    registerCanvasApi({ renderImage, fitToContent, centerOn })
+    return () => registerCanvasApi(null)
+  }, [renderImage, fitToContent, centerOn])
+
+  // --- pointer interaction ------------------------------------------------
+  const isBackground = (e) => {
+    const t = e.target
+    return t === t.getStage() || t.name() === 'background'
+  }
+
+  const onPointerDown = (e) => {
+    const stage = stageRef.current
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+    const world = toWorld(pos)
+
+    // Middle mouse and space-drag always pan, whatever the tool.
+    const wantsPan =
+      e.evt?.button === 1 || panRef.current?.spaceHeld || tool === 'hand'
+
+    if (wantsPan || (tool === 'select' && isBackground(e))) {
+      panRef.current = {
+        ...panRef.current,
+        active: true,
+        startX: pos.x,
+        startY: pos.y,
+        originX: vp.x,
+        originY: vp.y,
+        moved: false,
+      }
+      if (tool === 'select' && isBackground(e)) {
+        setSelected(null)
+        setStrongs(null)
+      }
+      return
+    }
+
+    if (!isBackground(e) && tool === 'select') return
+
+    if (DRAW_TOOLS.has(tool)) {
+      setSelected(null)
+      setDraft({ type: tool, startX: world.x, startY: world.y, x: world.x, y: world.y })
+      return
+    }
+
+    if (CLICK_TOOLS.has(tool)) {
+      if (tool === 'note') {
+        const id = addNote({
+          x: world.x,
+          y: world.y,
+          text: '',
+          tag: ui.noteTag,
+          panel:
+            ui.noteTag === 'observation'
+              ? 'observations'
+              : ui.noteTag === 'question'
+                ? 'questions'
+                : ui.noteTag === 'application'
+                  ? 'application'
+                  : null,
+        })
+        setSelected(id)
+        setEditing(id)
+      } else {
+        const id = addShape({
+          type: 'text',
+          x: world.x,
+          y: world.y,
+          text: '',
+          fontSize: 18,
+          color: ui.color,
+          tag: ui.noteTag,
+          width: 240,
+        })
+        setSelected(id)
+        setEditing(id)
+      }
+      setTool('select')
+    }
+  }
+
+  const onPointerMove = () => {
+    const stage = stageRef.current
+    const pos = stage?.getPointerPosition()
+    if (!pos) return
+
+    if (panRef.current?.active) {
+      const p = panRef.current
+      const dx = pos.x - p.startX
+      const dy = pos.y - p.startY
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) p.moved = true
+      setViewport({ ...vp, x: p.originX + dx, y: p.originY + dy })
+      return
+    }
+
+    if (draft) {
+      const world = toWorld(pos)
+      setDraft({ ...draft, x: world.x, y: world.y })
+    }
+  }
+
+  const onPointerUp = () => {
+    if (panRef.current?.active) {
+      panRef.current = { ...panRef.current, active: false }
+      return
+    }
+    if (!draft) return
+
+    const x = Math.min(draft.startX, draft.x)
+    const y = Math.min(draft.startY, draft.y)
+    const width = Math.abs(draft.x - draft.startX)
+    const height = Math.abs(draft.y - draft.startY)
+
+    if (draft.type === 'arrow') {
+      const dx = draft.x - draft.startX
+      const dy = draft.y - draft.startY
+      if (Math.hypot(dx, dy) > 12) {
+        const id = addShape({
+          type: 'arrow',
+          x: draft.startX,
+          y: draft.startY,
+          points: [0, 0, dx, dy],
+          color: ui.color,
+          strokeWidth: ui.strokeWidth,
+          tag: ui.noteTag,
+        })
+        setSelected(id)
+      }
+    } else if (width > 8 && height > 8) {
+      const id = addShape({
+        type: draft.type,
+        x,
+        y,
+        width,
+        height,
+        color: ui.color,
+        strokeWidth: ui.strokeWidth,
+        opacity: draft.type === 'highlight' ? 0.3 : 1,
+        tag: ui.noteTag,
+      })
+      setSelected(id)
+    }
+
+    setDraft(null)
+    setTool('select')
+  }
+
+  const onWheel = (e) => {
+    e.evt.preventDefault()
+    const stage = stageRef.current
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+
+    // Scrolling zooms, anchored on the cursor — hold shift to pan instead.
+    if (e.evt.shiftKey) {
+      setViewport({ ...vp, x: vp.x - e.evt.deltaX, y: vp.y - e.evt.deltaY })
+      return
+    }
+
+    // Normalize across mouse wheels (large, chunky deltas), trackpads (small,
+    // continuous) and page/line delta modes, so one notch is one step.
+    const unit = e.evt.deltaMode === 1 ? 16 : e.evt.deltaMode === 2 ? 400 : 1
+    const delta = Math.max(-240, Math.min(240, e.evt.deltaY * unit))
+    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, vp.scale * Math.exp(-delta * 0.0015)))
+    if (next === vp.scale) return
+
+    const wx = (pos.x - vp.x) / vp.scale
+    const wy = (pos.y - vp.y) / vp.scale
+    setViewport({ scale: next, x: pos.x - wx * next, y: pos.y - wy * next })
+  }
+
+  // Space-to-pan, the way every canvas tool works.
+  useEffect(() => {
+    const down = (ev) => {
+      if (ev.code === 'Space' && !ev.repeat) {
+        const tag = ev.target?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || ev.target?.isContentEditable) return
+        ev.preventDefault()
+        panRef.current = { ...panRef.current, spaceHeld: true }
+        const el = containerRef.current
+        if (el) el.style.cursor = 'grab'
+      }
+    }
+    const up = (ev) => {
+      if (ev.code === 'Space') {
+        panRef.current = { ...panRef.current, spaceHeld: false }
+        const el = containerRef.current
+        if (el) el.style.cursor = ''
+      }
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
+
+  /**
+   * Persist a note resize. Notes carry their own corner handles rather than the
+   * Transformer: a note's height is derived from its wrapped text, and mutating
+   * that mid-transform fights the Transformer's own drag bookkeeping. The handle
+   * hands us an already-clamped box; only the last frame becomes an undo step.
+   */
+  const resizeNote = useCallback(
+    (id, box, done) => updateNote(id, box, done ? undefined : { history: false }),
+    [updateNote],
+  )
+
+  // --- transformer ---------------------------------------------------------
+  useEffect(() => {
+    const tr = trRef.current
+    const stage = stageRef.current
+    if (!tr || !stage) return
+    const shape = shapes.find((s) => s.id === selectedId)
+    const node =
+      shape && shape.type !== 'arrow' ? stage.findOne(`#${selectedId}`) : null
+    tr.nodes(node ? [node] : [])
+    tr.getLayer()?.batchDraw()
+  }, [selectedId, shapes, columns])
+
+  // --- word clicks ---------------------------------------------------------
+  const handleWordClick = (word, columnLabel, colIndex, evt) => {
+    if (tool !== 'select') return
+    evt.cancelBubble = true
+    if (!ui.showStrongs) return
+    const result = lookupStrongs(word.text)
+    const box = containerRef.current?.getBoundingClientRect()
+    const clientX = evt.evt?.clientX ?? 0
+    const clientY = evt.evt?.clientY ?? 0
+    setStrongs({
+      key: `${columnLabel}:${word.id}`,
+      word: word.text,
+      verse: word.verse,
+      found: !!result,
+      headword: result?.headword,
+      entries: result?.entries || [],
+      x: clientX - (box?.left || 0),
+      y: clientY - (box?.top || 0),
+    })
+  }
+
+  // --- connectors ----------------------------------------------------------
+  //
+  // A connector ties a note to its verse either as an arrow or as a highlight
+  // laid over the verse itself in the note's color. The highlight traces the
+  // verse line by line and keeps a hairline tether, so which note it belongs to
+  // stays readable once several verses are marked in the same color.
+  const connectorLines = useMemo(() => {
+    const noteById = new Map(notes.map((n) => [n.id, n]))
+    const out = []
+    for (const c of connectors) {
+      const note = noteById.get(c.noteId)
+      if (!note) continue
+      const colIndex = c.column ?? 0
+      const col = columns[colIndex]
+      if (!col) continue
+      const box = col.layout.verses.find((v) => v.verse === c.verse)
+      if (!box) continue
+
+      const originX = columnX(colIndex)
+      const width = noteWidth(note)
+      const height = noteHeight(note)
+      // Attach to whichever side of the note faces the passage.
+      const noteIsLeft = note.x + width < originX + box.minX
+      const from = {
+        x: noteIsLeft ? note.x + width : note.x,
+        y: note.y + Math.min(28, height / 2),
+      }
+      const to = {
+        x: originX + (noteIsLeft ? box.minX - 8 : box.maxX + 8),
+        y: layer.y + box.anchorY,
+      }
+
+      out.push({
+        id: c.id,
+        style: c.style === 'highlight' ? 'highlight' : 'arrow',
+        color: resolveTag(note.tag, customTags).hex,
+        rects: (box.lines || []).map((line) => ({
+          x: originX + line.x - 2,
+          y: layer.y + line.y,
+          width: line.width + 4,
+          height: line.height,
+        })),
+        points: [
+          from.x,
+          from.y,
+          from.x - (from.x - to.x) * 0.55,
+          from.y - (from.y - to.y) * 0.15,
+          to.x,
+          to.y,
+        ],
+      })
+    }
+    return out
+  }, [connectors, notes, columns, columnX, layer.y, customTags])
+
+  const cursor =
+    tool === 'hand'
+      ? 'grab'
+      : DRAW_TOOLS.has(tool)
+        ? 'crosshair'
+        : CLICK_TOOLS.has(tool)
+          ? 'copy'
+          : 'default'
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[#faf7f2]" style={{ cursor }}>
+      <Stage
+        ref={stageRef}
+        width={size.width}
+        height={size.height}
+        onMouseDown={onPointerDown}
+        onTouchStart={onPointerDown}
+        onMouseMove={onPointerMove}
+        onTouchMove={onPointerMove}
+        onMouseUp={onPointerUp}
+        onTouchEnd={onPointerUp}
+        onMouseLeave={onPointerUp}
+        onWheel={onWheel}
+        onContextMenu={(e) => e.evt.preventDefault()}
+      >
+        {/* Background: paper wash plus the dot grid, pinned to world space. */}
+        <Layer listening={false}>
+          <Rect ref={bgBaseRef} name="background" width={size.width} height={size.height} fill="#faf7f2" />
+          <Rect
+            ref={bgDotsRef}
+            name="background"
+            width={size.width}
+            height={size.height}
+            visible={ui.showGrid}
+            fillPatternImage={pattern}
+            fillPatternRepeat="repeat"
+            fillPatternX={vp.x}
+            fillPatternY={vp.y}
+            fillPatternScaleX={vp.scale}
+            fillPatternScaleY={vp.scale}
+          />
+        </Layer>
+
+        <Layer>
+          <Group id="world" x={vp.x} y={vp.y} scaleX={vp.scale} scaleY={vp.scale}>
+            {columns.map((col, i) => (
+              <ScriptureColumn
+                key={col.slot}
+                layout={col.layout}
+                style={style}
+                x={columnX(i)}
+                y={layer.y}
+                label={col.label}
+                reference={col.reference}
+                interactive={tool === 'select'}
+                activeWordId={strongsKey}
+                onWordClick={(w, evt) => handleWordClick(w, col.label, i, evt)}
+              />
+            ))}
+
+            {connectorLines.map((c) =>
+              c.style === 'highlight' ? (
+                <Group key={c.id} listening={false}>
+                  {c.rects.map((r, i) => (
+                    <Rect
+                      key={i}
+                      x={r.x}
+                      y={r.y}
+                      width={r.width}
+                      height={r.height}
+                      fill={c.color}
+                      opacity={0.22}
+                      cornerRadius={3}
+                    />
+                  ))}
+                  <Line
+                    points={c.points}
+                    tension={0.4}
+                    stroke={c.color}
+                    strokeWidth={1.2}
+                    opacity={0.4}
+                    dash={[4, 4]}
+                  />
+                </Group>
+              ) : (
+                <Arrow
+                  key={c.id}
+                  points={c.points}
+                  tension={0.4}
+                  stroke={c.color}
+                  fill={c.color}
+                  strokeWidth={1.6}
+                  opacity={0.75}
+                  pointerLength={8}
+                  pointerWidth={7}
+                  listening={false}
+                />
+              ),
+            )}
+
+            {shapes.map((shape) => (
+              <ShapeNode
+                key={shape.id}
+                shape={shape}
+                selected={selectedId === shape.id}
+                draggable={tool === 'select'}
+                onSelect={setSelected}
+                onEdit={setEditing}
+                onChange={(id, patch) => updateShape(id, patch)}
+              />
+            ))}
+
+            {notes.map((note) => (
+              <NoteNode
+                key={note.id}
+                note={note}
+                customTags={customTags}
+                fontEpoch={fontEpoch}
+                selected={selectedId === note.id}
+                onSelect={setSelected}
+                onDragMove={(id, x, y) => updateNote(id, { x, y }, { history: false })}
+                onDragEnd={(id, x, y) => updateNote(id, { x, y })}
+                onResize={resizeNote}
+                onEdit={setEditing}
+              />
+            ))}
+
+            {/* Live preview of the shape being drawn. */}
+            {draft && draft.type !== 'arrow' && (
+              <Rect
+                x={Math.min(draft.startX, draft.x)}
+                y={Math.min(draft.startY, draft.y)}
+                width={Math.abs(draft.x - draft.startX)}
+                height={Math.abs(draft.y - draft.startY)}
+                stroke={draft.type === 'box' ? ui.color : undefined}
+                strokeWidth={ui.strokeWidth}
+                fill={draft.type === 'highlight' ? ui.color : undefined}
+                opacity={draft.type === 'highlight' ? 0.3 : 0.9}
+                cornerRadius={draft.type === 'box' ? 4 : 2}
+                listening={false}
+              />
+            )}
+            {draft && draft.type === 'arrow' && (
+              <Arrow
+                x={draft.startX}
+                y={draft.startY}
+                points={[0, 0, draft.x - draft.startX, draft.y - draft.startY]}
+                stroke={ui.color}
+                fill={ui.color}
+                strokeWidth={ui.strokeWidth}
+                pointerLength={10}
+                pointerWidth={9}
+                listening={false}
+              />
+            )}
+
+            <Transformer
+              ref={trRef}
+              rotateEnabled={false}
+              keepRatio={false}
+              borderStroke="#1c1917"
+              borderStrokeWidth={1}
+              anchorStroke="#1c1917"
+              anchorFill="#ffffff"
+              anchorSize={8}
+              anchorCornerRadius={2}
+              boundBoxFunc={(oldBox, newBox) =>
+                newBox.width < 12 || newBox.height < 12 ? oldBox : newBox
+              }
+            />
+          </Group>
+        </Layer>
+      </Stage>
+
+      <Toolbar />
+      <ZoomControls scale={vp.scale} onZoom={zoomBy} onFit={() => fitToContent()} />
+      <SelectionPopover bounds={size} />
+      <StrongsTooltip bounds={size} />
+      <CanvasTextEditor />
+    </div>
+  )
+}
+
+export { MIN_SCALE, MAX_SCALE }

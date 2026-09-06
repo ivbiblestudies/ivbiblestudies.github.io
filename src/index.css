@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --font-ui: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-scripture: "Literata", Georgia, serif;
+
+  /* Tag palette — also mirrored in src/data/tags.js for canvas (Konva) use. */
+  --color-tag-observation: #0f766e;
+  --color-tag-question: #7c3aed;
+  --color-tag-application: #c2410c;
+  --color-tag-none: #57534e;
+
+  --color-ink: #1c1917;
+  --color-paper: #faf7f2;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: var(--font-ui);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Thin, unobtrusive scrollbars in the sidebar. */
+.scroll-slim { scrollbar-width: thin; scrollbar-color: #d6d3d1 transparent; }
+.scroll-slim::-webkit-scrollbar { width: 8px; }
+.scroll-slim::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 99px; }
+.scroll-slim::-webkit-scrollbar-track { background: transparent; }
+
+/* Konva mounts a plain <canvas>; keep the browser's touch gestures out of it. */
+.konvajs-content { touch-action: none; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.animate-fade-in { animation: fade-in 140ms ease-out; }

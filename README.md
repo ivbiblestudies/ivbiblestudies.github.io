@@ -1,0 +1,173 @@
+# Inductive Bible Study Canvas
+
+"Figma for inductive Bible study": a fully client-side canvas for manuscript
+work. Load a passage, mark it up on an infinite board, work the four movements of
+inductive study in the sidebar, and hand the whole thing to someone else as a
+link. No backend, no database, no account — the URL *is* the document.
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # static bundle in dist/
+npm run preview  # serve the built bundle
+```
+
+## What it does
+
+**Split workspace.** 70% infinite canvas over a dot grid, 30% structured sidebar.
+Scroll to zoom at the cursor, shift-scroll to pan, hold space to drag the board.
+
+**The scripture layer.** Fetch any passage in modern translations (NIV, ESV,
+NASB, NKJV, NLT, AMP, MSG, RSV) or public-domain ones (WEB, KJV, ASV, YLT and
+more), or paste your own text. Flip on *Parallel* to set two translations side by
+side. Every word is laid out and measured individually, so clicking one opens its
+Greek or Hebrew entry — lemma, transliteration, Strong's number, gloss. Typography
+is fully adjustable: family, size, line height, letter and word spacing, verse
+spacing, column width.
+
+**Annotation.** A docked rail on the left of the canvas: select, pan, box,
+highlighter, arrow, text and sticky note, plus tag and color pickers. Anything you
+create can be tagged **Observation** (teal), **Question** (violet) or
+**Application** (orange).
+
+**Sticky notes.** Each note takes an optional **title** — set it on the canvas
+(double-click, or *Edit* on the selection bar) or in the sidebar card; it renders
+in bold above the body and carries through to the PDF export. Select a note and
+drag any **corner** to resize it: the opposite corner stays pinned, the type
+scales with the box the way a text frame does in a drawing tool, and a note can
+never be squeezed smaller than the text inside it.
+
+**Two ways to link a note to its verse.** An **arrow** drawn from the note to the
+text, or a **highlight** laid over the verse itself in the note's color, tracing
+it line by line with a hairline tether so you can still tell which note it belongs
+to. Switch either way per note from the selection bar.
+
+**Your own tags.** Beyond Observation, Question and Application, a study can define
+its own — *Announcement*, *Context*, *Cross-reference* — with their own colors, from
+the tag flyout on the rail. They behave like the built-ins everywhere: filter chips,
+note colors, the PDF. Notes wearing a custom tag collect under **Other notes** in
+the sidebar, since they don't belong to one of the four movements. Custom tags live
+in the document, so they travel in the share link.
+
+**Tag filtering.** Clicking a tag chip in the sidebar shows *only* that tag, on
+the canvas and in the panels at once; clicking it again returns to everything, and
+⌘/Ctrl/Shift-click builds a multi-tag view.
+
+**Quick entry.** Paste verse-keyed notes into the Observations, Questions or
+Application panel:
+
+```
+v3: Repeated word "grace"
+vv5-7 — contrast between flesh and spirit
+12, 14: who is "he" here?
+```
+
+Each line becomes a tagged sticky note placed beside its verse on the canvas,
+linked back to the text. Notes alternate between the left and right margins and
+fan outward into extra columns before they are ever pushed downward, so a long
+list stays level with the passage instead of trailing off below it. Ranges, comma lists, `v`/`vv`/`verse`
+prefixes and bullet markers all parse; a line with no verse number still becomes a
+note, just unanchored.
+
+**Study prompts.** Each panel carries a library of classic inductive questions —
+*Are there repeated words? Why is this detail included? Is there a promise to
+claim?* — that drop into your writing area.
+
+**Export.** High-resolution PNG of the canvas, a single-page PDF of the same, or a
+multi-page PDF combining the canvas map with every note and panel as selectable
+text. All rendered in the browser.
+
+**Sharing.** The entire document — scripture text, both translations, every
+annotation with its coordinates and colors, tags, panel prose and view settings —
+is JSON, compressed with `lz-string` and encoded into the URL fragment. Opening a
+link rebuilds the board exactly, offline, with no fetch.
+
+### Keyboard
+
+| | |
+|---|---|
+| `V` `H` `B` `G` `A` `T` `N` | select, pan, box, highlighter, arrow, text, note |
+| double-click a note | edit its title and body |
+| drag a note's corner | resize it |
+| scroll | zoom to cursor |
+| `Shift` + scroll | pan |
+| `Space` + drag | pan from any tool |
+| `⌘/Ctrl+Z` / `⇧⌘Z` | undo / redo |
+| `Delete` | remove selection |
+| `Esc` | deselect |
+
+## Passage sources
+
+Both providers are keyless and CORS-enabled, which is what lets this stay a static
+page with nothing to hide a secret in.
+
+| Source | Translations |
+|---|---|
+| [bible-api.com](https://bible-api.com) | public domain: WEB, KJV, ASV, BBE, YLT, DRA, OEB, Vulgate, Almeida |
+| [bolls.life](https://bolls.life) | modern: NIV, ESV, NASB, NKJV, NLT, AMP, MSG, RSV |
+
+Modern translations are under copyright and are fetched from a third-party public
+API for personal study; the app neither hosts nor redistributes them. If you'd
+rather work from your own licensed copy, every column has a **Paste text** mode
+that keeps the text entirely on your machine.
+
+Reference parsing for the bolls source is local (`src/data/books.js`) and handles
+`John 3`, `John 3:16`, `John 3:16-18`, `John 3-4`, `John 3:16-4:2`, `1 Cor 13`,
+`Ps 23`, and common abbreviations.
+
+## Deploying to GitHub Pages
+
+`.github/workflows/deploy.yml` builds and publishes `dist/` on every push to
+`main` — enable Pages with source *GitHub Actions* and it works as-is. Vite is
+configured with `base: './'`, so the bundle runs from any sub-path, and study
+state lives in the hash fragment, which Pages never sees.
+
+## How it's built
+
+React 19 · Vite · Tailwind CSS v4 · react-konva · zustand · lz-string · jsPDF.
+
+```
+src/
+  App.jsx                 layout, URL hydration/sync, global shortcuts
+  store.js                the document model, history, quick-entry pipeline
+  components/
+    canvas/               Konva stage, scripture columns, notes, shapes, overlays
+    sidebar/              accordion panels, quick entry, prompts, note cards
+    SettingsModal · ExportModal · ShareModal · TopBar · ui.jsx · icons.jsx
+  lib/
+    textLayout.js         per-word measuring and line breaking
+    quickEntry.js         verse-reference parser for pasted notes
+    noteMetrics.js        sticky-note wrapping, sizing and resize floors
+    bibleApi.js           provider router + bible-api.com client + paste parser
+    bolls.js              bolls.life client for modern translations
+    urlState.js           lz-string encode/decode
+    exporters.js          PNG and PDF output
+  data/
+    strongs.js            bundled lexicon (see below)
+    books.js              canonical book table and reference parser
+    prompts.js · tags.js · translations.js
+```
+
+Three design decisions worth knowing about:
+
+**Words are laid out by hand.** Konva can wrap a paragraph, but then no word has
+an identity — you couldn't click one for its lemma or point an arrow at verse 3.
+So `textLayout.js` measures each word with a 2D context using the exact font
+string Konva will render with, and emits positioned words plus per-verse geometry
+(including one rect per rendered line, which is what a highlight traces).
+Because that measuring happens in JS while the painting happens later, layout is
+re-run once `document.fonts` reports the real faces have loaded (`useFonts.js`) —
+otherwise words are spaced for the fallback font and run into each other.
+
+**The Strong's lexicon is a curated slice.** The full dataset is ~14k entries and
+several megabytes, which is a poor trade for a static app. `src/data/strongs.js`
+ships the vocabulary that actually carries inductive study — theological terms,
+connectives, repeated words — indexed by English headword with stemming and
+aliases, so one click shows every original-language word behind that English one.
+Unknown words say so rather than guessing. Swap in a full Strong's JSON by
+replacing `LEXICON` with the same shape; nothing else changes.
+
+**Section headings are stripped heuristically.** bolls.life marks both section
+headings and poetic line breaks with `<br/>`. A leading segment is dropped only
+when it looks like a heading — short, capitalized, no sentence punctuation — so
+poetry keeps its lines (`src/lib/bolls.js`).
