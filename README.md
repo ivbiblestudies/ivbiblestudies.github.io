@@ -91,9 +91,12 @@ text. All rendered in the browser.
 the address bar at the base URL. Refreshing restores that draft. **Share → Copy
 link** creates a native gzip + Base64URL snapshot (`#s=gz1.…`) using the browser's
 CompressionStream API, containing the scripture, annotations, tags, panel
-prose and view settings, then requests a free short link from is.gd. The shortener
+prose and view settings, then requests a free short link from zip1.io. Aliases use
+the study title with punctuation removed and spaces replaced by dashes, limited
+to 12 characters. A 409 conflict retries with random numeric suffixes, shortening
+the title portion to keep that limit (up to 10 attempts). The shortener
 stores the full snapshot link, including notes; anyone with the link can open it.
-Links above is.gd's 5,000-character limit, local preview links, and service failures
+Local preview links and service failures
 fall back to the full `#s=...` link. Opening a shared link (including legacy `?s=`
 links) loads and saves its snapshot locally, then clears the address to the base
 URL. Older LZ-String links remain readable through a lazily loaded legacy decoder.

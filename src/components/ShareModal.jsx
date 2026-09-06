@@ -28,7 +28,8 @@ export default function ShareModal() {
     setCopied(false)
     setMessage('')
     try {
-      const result = await shortenUrl(await buildShareUrl(pickDoc(useStudy.getState())))
+      const snapshot = pickDoc(useStudy.getState())
+      const result = await shortenUrl(await buildShareUrl(snapshot), snapshot.title)
       setUrl(result.url)
       setMessage(result.message || 'Short link ready. It opens a snapshot of this study.')
       try {
@@ -62,7 +63,7 @@ export default function ShareModal() {
         click Copy link; your address bar stays at the base URL.
       </p>
       <p className="mt-3 text-xs text-stone-500">
-        Free short links use is.gd, which stores the full snapshot link, including
+        Free short links use zip1.io, which stores the full snapshot link, including
         your notes. Anyone with the link can open that snapshot. If shortening is
         unavailable or the study is too large, you’ll get the full link instead.
       </p>
