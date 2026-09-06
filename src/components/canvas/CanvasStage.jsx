@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Stage, Layer, Group, Rect, Arrow, Line, Transformer } from 'react-konva'
 import { useShallow } from 'zustand/shallow'
 import { useStudy, visibleNotes, visibleShapes } from '../../store'
-import { layoutPassage } from '../../lib/textLayout'
+import { layoutPassage, connectorBox } from '../../lib/textLayout'
+import { highlightNotesAt } from '../../lib/connections'
 import { publishLayout } from '../../lib/layoutRegistry'
 import { registerCanvasApi } from '../../lib/canvasApi'
 import { useFontEpoch } from '../../lib/useFonts'
@@ -48,6 +49,9 @@ export default function CanvasStage() {
 
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [draft, setDraft] = useState(null)
+  const [wordSelection, setWordSelection] = useState(null)
+  const [hoveredNoteId, setHoveredNoteId] = useState(null)
+  const [hoveredHighlightNotes, setHoveredHighlightNotes] = useState([])
   const panRef = useRef(null)
 
   const scripture = useStudy((s) => s.scripture)
@@ -70,9 +74,23 @@ export default function CanvasStage() {
   const updateShape = useStudy((s) => s.updateShape)
   const addNote = useStudy((s) => s.addNote)
   const updateNote = useStudy((s) => s.updateNote)
+  const setConnectorRange = useStudy((s) => s.setConnectorRange)
 
   const vp = ui.viewport
   const tool = ui.tool
+
+  useEffect(() => {
+    setWordSelection(null)
+  }, [selectedId, tool, scripture])
+
+  useEffect(() => {
+    if (!wordSelection) return
+    const cancel = (event) => {
+      if (event.key === 'Escape') setWordSelection(null)
+    }
+    window.addEventListener('keydown', cancel)
+    return () => window.removeEventListener('keydown', cancel)
+  }, [wordSelection])
 
   // Re-measure the passage and the notes once the webfonts are really loaded.
   const fontEpoch = useFontEpoch([style.fontFamily, 'Inter'])
@@ -303,7 +321,7 @@ export default function CanvasStage() {
         originY: vp.y,
         moved: false,
       }
-      if (tool === 'select' && isBackground(e)) {
+      if (tool === 'select' && isBackground(e) && !wordSelection) {
         setSelected(null)
         setStrongs(null)
       }
@@ -354,10 +372,14 @@ export default function CanvasStage() {
     }
   }
 
-  const onPointerMove = () => {
+  const onPointerMove = (event) => {
     const stage = stageRef.current
     const pos = stage?.getPointerPosition()
     if (!pos) return
+
+    const hitNotes = tool === 'select' && !wordSelection && !event?.target?.findAncestor('.note', true)
+      ? highlightNotesAt(connectorLines, toWorld(pos)) : []
+    setHoveredHighlightNotes((previous) => previous.length === hitNotes.length && previous.every((id, i) => id === hitNotes[i]) ? previous : hitNotes)
 
     if (panRef.current?.active) {
       const p = panRef.current
@@ -498,6 +520,24 @@ export default function CanvasStage() {
   const handleWordClick = (word, columnLabel, colIndex, evt) => {
     if (tool !== 'select') return
     evt.cancelBubble = true
+    if (panRef.current?.spaceHeld) return
+    if (wordSelection) {
+      const range = wordSelection.range
+      if (range && range.column === colIndex && range.verseIndex === word.verseIndex) {
+        setConnectorRange(wordSelection.noteId, {
+          ...range,
+          startWord: Math.min(range.startWord, word.wordIndex),
+          endWord: Math.max(range.startWord, word.wordIndex),
+        })
+        setWordSelection(null)
+      } else {
+        setWordSelection({ ...wordSelection, range: {
+          verse: word.verse, verseIndex: word.verseIndex, column: colIndex,
+          startWord: word.wordIndex, endWord: word.wordIndex,
+        } })
+      }
+      return
+    }
     if (!ui.showStrongs) return
     const result = lookupStrongs(word.text)
     const box = containerRef.current?.getBoundingClientRect()
@@ -530,7 +570,7 @@ export default function CanvasStage() {
       const colIndex = c.column ?? 0
       const col = columns[colIndex]
       if (!col) continue
-      const box = col.layout.verses.find((v) => v.verse === c.verse)
+      const box = connectorBox(col.layout, c)
       if (!box) continue
 
       const originX = columnX(colIndex)
@@ -549,6 +589,7 @@ export default function CanvasStage() {
 
       out.push({
         id: c.id,
+        noteId: c.noteId,
         style: c.style === 'highlight' ? 'highlight' : 'arrow',
         color: resolveTag(note.tag, customTags).hex,
         rects: (box.lines || []).map((line) => ({
@@ -569,6 +610,11 @@ export default function CanvasStage() {
     }
     return out
   }, [connectors, notes, columns, columnX, layer.y, customTags])
+
+  const previewRange = wordSelection?.range
+  const previewBox = previewRange && connectorBox(columns[previewRange.column]?.layout, previewRange)
+  const activeConnectionNotes = new Set(tool === 'select' && !wordSelection
+    ? [...hoveredHighlightNotes, hoveredNoteId].filter(Boolean) : [])
 
   const cursor =
     tool === 'hand'
@@ -591,7 +637,11 @@ export default function CanvasStage() {
         onTouchMove={onPointerMove}
         onMouseUp={onPointerUp}
         onTouchEnd={onPointerUp}
-        onMouseLeave={onPointerUp}
+        onMouseLeave={() => {
+          onPointerUp()
+          setHoveredNoteId(null)
+          setHoveredHighlightNotes([])
+        }}
         onWheel={onWheel}
         onContextMenu={(e) => e.evt.preventDefault()}
       >
@@ -626,13 +676,25 @@ export default function CanvasStage() {
                 reference={col.reference}
                 interactive={tool === 'select'}
                 activeWordId={strongsKey}
+                selectingWords={!!wordSelection}
+                onWordHover={(word) => {
+                  if (!previewRange || previewRange.column !== i || previewRange.verseIndex !== word.verseIndex) return
+                  setWordSelection((current) => current && ({ ...current, range: { ...current.range, endWord: word.wordIndex } }))
+                }}
                 onWordClick={(w, evt) => handleWordClick(w, col.label, i, evt)}
               />
             ))}
 
+            {previewBox?.lines.map((line, i) => (
+              <Rect key={`word-preview-${i}`} x={columnX(previewRange.column) + line.x - 2}
+                y={layer.y + line.y} width={line.width + 4} height={line.height}
+                fill={resolveTag(notes.find((n) => n.id === wordSelection.noteId)?.tag, customTags).hex}
+                opacity={0.35} cornerRadius={3} listening={false} />
+            ))}
+
             {connectorLines.map((c) =>
               c.style === 'highlight' ? (
-                <Group key={c.id} listening={false}>
+                <Group key={c.id} name="connection-highlight" listening={false}>
                   {c.rects.map((r, i) => (
                     <Rect
                       key={i}
@@ -641,7 +703,9 @@ export default function CanvasStage() {
                       width={r.width}
                       height={r.height}
                       fill={c.color}
-                      opacity={0.22}
+                      opacity={activeConnectionNotes.has(c.noteId) ? 0.42 : 0.22}
+                      stroke={activeConnectionNotes.has(c.noteId) ? c.color : undefined}
+                      strokeWidth={1.5}
                       cornerRadius={3}
                     />
                   ))}
@@ -649,8 +713,8 @@ export default function CanvasStage() {
                     points={c.points}
                     tension={0.4}
                     stroke={c.color}
-                    strokeWidth={1.2}
-                    opacity={0.4}
+                    strokeWidth={activeConnectionNotes.has(c.noteId) ? 2.4 : 1.2}
+                    opacity={activeConnectionNotes.has(c.noteId) ? 0.9 : 0.4}
                     dash={[4, 4]}
                   />
                 </Group>
@@ -689,6 +753,8 @@ export default function CanvasStage() {
                 customTags={customTags}
                 fontEpoch={fontEpoch}
                 selected={selectedId === note.id}
+                connectionHovered={activeConnectionNotes.has(note.id)}
+                onHover={setHoveredNoteId}
                 onSelect={setSelected}
                 onDragMove={(id, x, y) => updateNote(id, { x, y }, { history: false })}
                 onDragEnd={(id, x, y) => updateNote(id, { x, y })}
@@ -746,7 +812,22 @@ export default function CanvasStage() {
 
       <Toolbar />
       <ZoomControls scale={vp.scale} onZoom={zoomBy} onFit={() => fitToContent()} />
-      <SelectionPopover bounds={size} />
+      {!wordSelection && <SelectionPopover bounds={size} onSelectWords={(noteId) => {
+        setTool('select')
+        setStrongs(null)
+        panRef.current = null
+        setWordSelection({ noteId, range: null })
+      }} />}
+      {wordSelection && (
+        <div role="status" className="absolute left-1/2 top-4 z-30 flex max-w-[90%] -translate-x-1/2 items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 text-xs shadow-lg">
+          <span>{previewRange ? 'Click the last word in the same verse, or save this selection.' : 'Click the first word of the phrase to connect to this note.'}</span>
+          {previewRange && <button type="button" className="rounded-lg bg-stone-900 px-3 py-2 font-semibold whitespace-nowrap text-white" onClick={() => {
+            setConnectorRange(wordSelection.noteId, { ...previewRange, startWord: Math.min(previewRange.startWord, previewRange.endWord), endWord: Math.max(previewRange.startWord, previewRange.endWord) })
+            setWordSelection(null)
+          }}>Save selection</button>}
+          <button type="button" className="rounded-lg px-2 py-2 font-semibold hover:bg-stone-100" onClick={() => setWordSelection(null)}>Cancel</button>
+        </div>
+      )}
       <StrongsTooltip bounds={size} />
       <CanvasTextEditor />
     </div>

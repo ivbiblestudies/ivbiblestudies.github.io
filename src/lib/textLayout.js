@@ -75,6 +75,7 @@ export function layoutPassage(verses, style) {
     }
 
     const box = {
+      verseIndex: vi,
       verse: v.verse,
       chapter: v.chapter,
       minX: x,
@@ -109,7 +110,9 @@ export function layoutPassage(verses, style) {
       if (x > 0 && x + w > width) newline()
 
       words.push({
-        id: `w_${v.verse}_${ti}`,
+        id: `w_${vi}_${ti}`,
+        verseIndex: vi,
+        wordIndex: tok.isVerseNum ? -1 : ti - (s.showVerseNumbers ? 1 : 0),
         text: tok.text,
         verse: v.verse,
         index: ti,
@@ -168,3 +171,29 @@ export function layoutPassage(verses, style) {
 /** Geometry for one verse in a laid-out column, or null. */
 export const verseBox = (layout, verse) =>
   layout?.verses?.find((v) => v.verse === verse) || null
+
+/** Resolve saved word indices against the current layout, including reflow. */
+export function connectorBox(layout, connector) {
+  const box = connector.verseIndex == null
+    ? verseBox(layout, connector.verse)
+    : layout?.verses?.find((v) => v.verseIndex === connector.verseIndex && v.verse === connector.verse)
+  if (!box) return null
+  if (connector.startWord == null || connector.endWord == null) return box
+  const start = Math.min(connector.startWord, connector.endWord)
+  const end = Math.max(connector.startWord, connector.endWord)
+  const words = layout.words.filter((w) => w.verseIndex === box.verseIndex && !w.isVerseNum && w.wordIndex >= start && w.wordIndex <= end)
+  if (!words.length || words[0].wordIndex !== start || words.at(-1).wordIndex !== end) return null
+  const rows = new Map()
+  for (const w of words) {
+    const row = rows.get(w.y)
+    if (row) row.width = w.x + w.w - row.x
+    else rows.set(w.y, { x: w.x, y: w.y - w.fontSize * 0.22, width: w.w, height: w.fontSize * 1.42 })
+  }
+  return {
+    ...box,
+    minX: Math.min(...words.map((w) => w.x)),
+    maxX: Math.max(...words.map((w) => w.x + w.w)),
+    anchorY: words[0].y + words[0].h / 2,
+    lines: [...rows.values()],
+  }
+}

@@ -32,6 +32,8 @@ function NoteNode({
   customTags,
   fontEpoch,
   selected,
+  connectionHovered = false,
+  onHover,
   onSelect,
   onDragMove,
   onDragEnd,
@@ -111,10 +113,12 @@ function NoteNode({
       onDblClick={() => onEdit?.(note.id)}
       onDblTap={() => onEdit?.(note.id)}
       onMouseEnter={(e) => {
+        onHover?.(note.id)
         const c = e.target.getStage()?.container()
         if (c) c.style.cursor = 'move'
       }}
       onMouseLeave={(e) => {
+        onHover?.(null)
         const c = e.target.getStage()?.container()
         if (c) c.style.cursor = ''
       }}
@@ -123,12 +127,13 @@ function NoteNode({
         width={width}
         height={height}
         fill={tag.soft}
-        stroke={selected ? tag.hex : 'rgba(28,25,23,0.14)'}
-        strokeWidth={selected ? 2 : 1}
+        name="note-surface"
+        stroke={selected || connectionHovered ? tag.hex : 'rgba(28,25,23,0.14)'}
+        strokeWidth={connectionHovered ? 3 : selected ? 2 : 1}
         cornerRadius={6}
-        shadowColor="#1c1917"
-        shadowOpacity={selected ? 0.16 : 0.08}
-        shadowBlur={selected ? 14 : 8}
+        shadowColor={connectionHovered ? tag.hex : '#1c1917'}
+        shadowOpacity={connectionHovered ? 0.35 : selected ? 0.16 : 0.08}
+        shadowBlur={connectionHovered ? 20 : selected ? 14 : 8}
         shadowOffsetY={selected ? 4 : 2}
       />
       {/* Colored spine keeps the tag readable even when zoomed out. */}

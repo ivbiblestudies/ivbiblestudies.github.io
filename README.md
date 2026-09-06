@@ -42,6 +42,16 @@ text, or a **highlight** laid over the verse itself in the note's color, tracing
 it line by line with a hairline tether so you can still tell which note it belongs
 to. Switch either way per note from the selection bar.
 
+To link a specific phrase, select a sticky note and choose **Add highlight**.
+Click the first and last word within one verse; the preview follows your cursor
+and the saved highlight covers only those words. For one word, click it and choose
+**Save selection**. **Cancel** or Escape keeps the previous connection. Word
+selections follow text reflow and are preserved in shared studies and undo/redo.
+Use **Add highlight** again to connect more phrases or repetitions to the same
+note. The first phrase replaces the automatic whole-verse connection; subsequent
+phrases keep earlier selections. Hover a highlight to outline its note, or hover
+the note to emphasize all its highlights and connecting lines.
+
 **Your own tags.** Beyond Observation, Question and Application, a study can define
 its own — *Announcement*, *Context*, *Cross-reference* — with their own colors, from
 the tag flyout on the rail. They behave like the built-ins everywhere: filter chips,

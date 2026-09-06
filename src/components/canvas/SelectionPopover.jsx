@@ -9,7 +9,7 @@ const PANEL_FOR_TAG = Object.fromEntries(
 )
 
 /** Retag, recolor or delete the selected canvas object. */
-export default function SelectionPopover({ bounds }) {
+export default function SelectionPopover({ bounds, onSelectWords }) {
   const selectedId = useStudy((s) => s.selectedId)
   const editingId = useStudy((s) => s.editingId)
   const notes = useStudy((s) => s.notes)
@@ -33,7 +33,7 @@ export default function SelectionPopover({ bounds }) {
   const width = note ? note.width || NOTE_WIDTH : shape.width || 180
   // The bar grows with the number of tags and the link toggle, so keep a
   // generous right margin or it clips against the sidebar.
-  const barWidth = 220 + tagList(customTags).length * 52 + (note && linked.length ? 130 : 0)
+  const barWidth = 220 + tagList(customTags).length * 52 + (note ? 220 : 0)
   const left = Math.max(
     8,
     Math.min(
@@ -77,7 +77,7 @@ export default function SelectionPopover({ bounds }) {
 
       <span className="mx-0.5 h-5 w-px bg-stone-200" />
 
-      {note && linked && (
+      {note && linked.length > 0 && (
         <>
           <button
             type="button"
@@ -107,6 +107,17 @@ export default function SelectionPopover({ bounds }) {
           </button>
           <span className="mx-0.5 h-5 w-px bg-stone-200" />
         </>
+      )}
+
+      {note && (
+        <button
+          type="button"
+          title="Add another highlighted phrase connected to this note"
+          onClick={() => onSelectWords(note.id)}
+          className="h-7 whitespace-nowrap rounded-lg px-2 text-[11px] font-semibold text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+        >
+          Add highlight
+        </button>
       )}
 
       {(note || shape.type === 'text') && (

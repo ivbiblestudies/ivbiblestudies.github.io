@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { uid } from './lib/id'
+import { appendHighlight } from './lib/connections'
 import { DEFAULT_STYLE } from './lib/textLayout'
 import { readLayout } from './lib/layoutRegistry'
 import { NOTE_WIDTH, noteHeight } from './lib/noteMetrics'
@@ -401,6 +402,14 @@ export const useStudy = create((set, get) => {
           c.noteId === noteId ? { ...c, style } : c,
         ),
       })),
+
+    /** Add another phrase, replacing only the initial whole-verse target. */
+    setConnectorRange: (noteId, range) =>
+      commit((s) => {
+        if (!s.notes.some((n) => n.id === noteId)) return null
+        const connectors = appendHighlight(s.connectors, { id: uid('c'), noteId, ...range, style: 'highlight' })
+        return connectors === s.connectors ? null : { connectors }
+      }),
 
     setPanelText: (panel, text) =>
       commit((s) => ({ panels: { ...s.panels, [panel]: text } }), { history: false }),

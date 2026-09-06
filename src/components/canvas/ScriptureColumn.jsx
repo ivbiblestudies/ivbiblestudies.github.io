@@ -15,6 +15,8 @@ function ScriptureColumn({
   reference,
   activeWordId,
   onWordClick,
+  onWordHover,
+  selectingWords = false,
   interactive = true,
 }) {
   const stack = fontStack(style.fontFamily)
@@ -80,8 +82,9 @@ function ScriptureColumn({
               onTap={(evt) => onWordClick?.(w, evt)}
               onMouseEnter={(evt) => {
                 if (!interactive || w.isVerseNum) return
+                onWordHover?.(w)
                 const container = evt.target.getStage()?.container()
-                if (container) container.style.cursor = 'help'
+                if (container) container.style.cursor = selectingWords ? 'text' : 'help'
               }}
               onMouseLeave={(evt) => {
                 const container = evt.target.getStage()?.container()
