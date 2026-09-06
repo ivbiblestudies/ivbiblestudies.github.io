@@ -28,7 +28,7 @@ export default function ShareModal() {
     setCopied(false)
     setMessage('')
     try {
-      const result = await shortenUrl(buildShareUrl(pickDoc(useStudy.getState())))
+      const result = await shortenUrl(await buildShareUrl(pickDoc(useStudy.getState())))
       setUrl(result.url)
       setMessage(result.message || 'Short link ready. It opens a snapshot of this study.')
       try {
@@ -37,6 +37,9 @@ export default function ShareModal() {
       } catch {
         setMessage(`${result.message || 'Link ready.'} Select the link below and copy it manually.`)
       }
+    } catch (error) {
+      setUrl('')
+      setMessage(error.message || 'Could not create a share link. Please try again.')
     } finally {
       pending.current = false
       setBusy(false)

@@ -89,13 +89,16 @@ text. All rendered in the browser.
 
 **Saving and sharing.** Editing saves the current draft in localStorage and keeps
 the address bar at the base URL. Refreshing restores that draft. **Share → Copy
-link** creates a compressed snapshot of the scripture, annotations, tags, panel
+link** creates a native gzip + Base64URL snapshot (`#s=gz1.…`) using the browser's
+CompressionStream API, containing the scripture, annotations, tags, panel
 prose and view settings, then requests a free short link from is.gd. The shortener
 stores the full snapshot link, including notes; anyone with the link can open it.
 Links above is.gd's 5,000-character limit, local preview links, and service failures
 fall back to the full `#s=...` link. Opening a shared link (including legacy `?s=`
 links) loads and saves its snapshot locally, then clears the address to the base
-URL. Short links require internet access to redirect. Clear browser site data to
+URL. Older LZ-String links remain readable through a lazily loaded legacy decoder.
+New links require browsers supporting CompressionStream/DecompressionStream.
+Short links require internet access to redirect. Clear browser site data to
 remove the local draft; copying the base URL alone does not share your study.
 
 ### Keyboard
@@ -156,7 +159,7 @@ src/
     noteMetrics.js        sticky-note wrapping, sizing and resize floors
     bibleApi.js           provider router + bible-api.com client + paste parser
     bolls.js              bolls.life client for modern translations
-    urlState.js           lz-string encode/decode
+    urlState.js           native gzip/Base64URL, legacy decoding, local drafts
     exporters.js          PNG and PDF output
   data/
     strongs.js            bundled lexicon (see below)

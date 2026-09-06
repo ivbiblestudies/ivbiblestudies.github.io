@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStudy, pickDoc } from './store'
 import { readStateFromLocation, clearLocationState, readLocalDraft, saveLocalDraft } from './lib/urlState'
 import CanvasStage from './components/canvas/CanvasStage'
@@ -66,17 +66,15 @@ export default function App() {
   const deleteSelected = useStudy((s) => s.deleteSelected)
   const editingId = useStudy((s) => s.editingId)
 
-  const initialized = useRef(false)
+  const initialSnapshot = useRef(null)
+  const [hydrated, setHydrated] = useState(false)
 
   // Rebuild a shared study before the first paint of real content.
   useEffect(() => {
-    if (!initialized.current) {
-      initialized.current = true
-      const shared = readStateFromLocation()
-      const draft = shared || readLocalDraft()
-      if (draft) loadDoc(draft, { shared: !!shared })
-      clearLocationState()
-    }
+    let cancelled = false
+    let unsubscribe
+    // Share one decode promise across StrictMode's effect setup/cleanup cycle.
+    if (!initialSnapshot.current) initialSnapshot.current = readStateFromLocation()
     let warned = false
     const save = (state, previous) => {
       const doc = pickDoc(state)
@@ -86,13 +84,27 @@ export default function App() {
         state.setNotice('Browser storage is unavailable or full. Copy a share link before leaving to keep this study.')
       }
     }
-    save(useStudy.getState())
-    return useStudy.subscribe(save)
+    initialSnapshot.current.then((shared) => {
+      if (cancelled) return
+      const hadSharedPayload = new URLSearchParams(window.location.hash.slice(1)).has('s') ||
+        new URLSearchParams(window.location.search).has('s')
+      const draft = shared || readLocalDraft()
+      if (draft) loadDoc(draft, { shared: !!shared })
+      clearLocationState()
+      if (hadSharedPayload && !shared) {
+        useStudy.getState().setNotice('The shared link could not be opened. Your local draft was kept. Try the link in a current browser.')
+      }
+      save(useStudy.getState())
+      unsubscribe = useStudy.subscribe(save)
+      setHydrated(true)
+    })
+    return () => { cancelled = true; unsubscribe?.() }
   }, [loadDoc])
 
   // Global shortcuts.
   useEffect(() => {
     const onKey = (e) => {
+      if (!hydrated) return
       const tag = e.target?.tagName
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable
       const mod = e.metaKey || e.ctrlKey
@@ -125,7 +137,9 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo, setTool, setSelected, deleteSelected, editingId])
+  }, [undo, redo, setTool, setSelected, deleteSelected, editingId, hydrated])
+
+  if (!hydrated) return <div role="status" className="flex h-full items-center justify-center text-sm text-stone-500">Opening study…</div>
 
   return (
     <div className="flex h-full flex-col bg-stone-100">
