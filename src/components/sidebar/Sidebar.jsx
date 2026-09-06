@@ -268,8 +268,8 @@ export default function Sidebar() {
         <LooseNotes />
 
         <div className="px-4 py-6 text-[11px] leading-relaxed text-stone-400">
-          Everything here — canvas, notes, tags and settings — lives in the URL.
-          Copy the share link to hand the whole study to someone else.
+          Your study saves in this browser. Use Share to create and copy a link
+          to a snapshot of your canvas, notes, tags and settings.
         </div>
       </div>
     </aside>

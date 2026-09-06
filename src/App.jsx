@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { useShallow } from 'zustand/shallow'
+import { useEffect, useRef } from 'react'
 import { useStudy, pickDoc } from './store'
-import { readStateFromLocation, syncLocation } from './lib/urlState'
+import { readStateFromLocation, clearLocationState, readLocalDraft, saveLocalDraft } from './lib/urlState'
 import CanvasStage from './components/canvas/CanvasStage'
 import Sidebar from './components/sidebar/Sidebar'
 import TopBar from './components/TopBar'
@@ -60,7 +59,6 @@ function Toast() {
 
 export default function App() {
   const loadDoc = useStudy((s) => s.loadDoc)
-  const doc = useStudy(useShallow(pickDoc))
   const undo = useStudy((s) => s.undo)
   const redo = useStudy((s) => s.redo)
   const setTool = useStudy((s) => s.setTool)
@@ -68,26 +66,29 @@ export default function App() {
   const deleteSelected = useStudy((s) => s.deleteSelected)
   const editingId = useStudy((s) => s.editingId)
 
-  const [hydrated, setHydrated] = useState(false)
-  const firstSync = useRef(true)
+  const initialized = useRef(false)
 
   // Rebuild a shared study before the first paint of real content.
   useEffect(() => {
-    const shared = readStateFromLocation()
-    if (shared) loadDoc(shared, { shared: true })
-    setHydrated(true)
-  }, [loadDoc])
-
-  // Keep the address bar in step with the document, debounced so typing doesn't
-  // thrash history.replaceState.
-  useEffect(() => {
-    if (!hydrated) return
-    if (firstSync.current) {
-      firstSync.current = false
+    if (!initialized.current) {
+      initialized.current = true
+      const shared = readStateFromLocation()
+      const draft = shared || readLocalDraft()
+      if (draft) loadDoc(draft, { shared: !!shared })
+      clearLocationState()
     }
-    const t = setTimeout(() => syncLocation(doc), 600)
-    return () => clearTimeout(t)
-  }, [doc, hydrated])
+    let warned = false
+    const save = (state, previous) => {
+      const doc = pickDoc(state)
+      if (previous && Object.keys(doc).every((key) => state[key] === previous[key])) return
+      if (!saveLocalDraft(doc) && !warned) {
+        warned = true
+        state.setNotice('Browser storage is unavailable or full. Copy a share link before leaving to keep this study.')
+      }
+    }
+    save(useStudy.getState())
+    return useStudy.subscribe(save)
+  }, [loadDoc])
 
   // Global shortcuts.
   useEffect(() => {

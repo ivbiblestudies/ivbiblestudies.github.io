@@ -1,82 +1,72 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useShallow } from 'zustand/shallow'
+import { useEffect, useRef, useState } from 'react'
 import { useStudy, pickDoc } from '../store'
 import { buildShareUrl } from '../lib/urlState'
-import { Modal, Button, Input, cx } from './ui'
-
-// Browsers and servers start choking on URLs past roughly this length.
-const SOFT_LIMIT = 8000
-const HARD_LIMIT = 32000
+import { shortenUrl } from '../lib/shortenUrl'
+import { Modal, Button, Input } from './ui'
 
 export default function ShareModal() {
   const open = useStudy((s) => s.shareOpen)
   const openShare = useStudy((s) => s.openShare)
-  const doc = useStudy(useShallow(pickDoc))
+  const [url, setUrl] = useState('')
+  const [message, setMessage] = useState('')
   const [copied, setCopied] = useState(false)
-
-  const url = useMemo(() => (open ? buildShareUrl(doc) : ''), [open, doc])
+  const [busy, setBusy] = useState(false)
+  const pending = useRef(false)
 
   useEffect(() => {
-    if (!copied) return
-    const t = setTimeout(() => setCopied(false), 1800)
-    return () => clearTimeout(t)
-  }, [copied])
+    if (open) {
+      setUrl('')
+      setMessage('')
+      setCopied(false)
+    }
+  }, [open])
 
   const copy = async () => {
+    if (pending.current) return
+    pending.current = true
+    setBusy(true)
+    setCopied(false)
+    setMessage('')
     try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-    } catch {
-      // Clipboard permissions vary; select the field so ⌘C still works.
-      const input = document.getElementById('share-url-field')
-      input?.focus()
-      input?.select()
+      const result = await shortenUrl(buildShareUrl(pickDoc(useStudy.getState())))
+      setUrl(result.url)
+      setMessage(result.message || 'Short link ready. It opens a snapshot of this study.')
+      try {
+        await navigator.clipboard.writeText(result.url)
+        setCopied(true)
+      } catch {
+        setMessage(`${result.message || 'Link ready.'} Select the link below and copy it manually.`)
+      }
+    } finally {
+      pending.current = false
+      setBusy(false)
     }
   }
 
-  const length = url.length
-  const level = length > HARD_LIMIT ? 'error' : length > SOFT_LIMIT ? 'warn' : 'ok'
-
   return (
-    <Modal
-      open={open}
-      onClose={() => openShare(false)}
+    <Modal open={open} onClose={() => { if (!busy) openShare(false) }}
       title="Share this study"
-      subtitle="The link is the document. No account, no server, nothing stored."
-      footer={
-        <>
-          <Button onClick={() => openShare(false)}>Close</Button>
-          <Button variant="primary" onClick={copy}>
-            {copied ? 'Copied ✓' : 'Copy link'}
-          </Button>
-        </>
-      }
+      subtitle="Create a link to the current version of your study."
+      footer={<>
+        <Button disabled={busy} onClick={() => openShare(false)}>Close</Button>
+        <Button variant="primary" disabled={busy} onClick={copy}>
+          {busy ? 'Creating link…' : copied ? 'Copied ✓' : 'Copy link'}
+        </Button>
+      </>}
     >
-      <div className="flex gap-2">
-        <Input id="share-url-field" readOnly value={url} onFocus={(e) => e.target.select()} className="font-mono text-xs" />
-        <Button onClick={copy}>{copied ? '✓' : 'Copy'}</Button>
-      </div>
-
-      <div className="mt-3 space-y-1.5 text-xs">
-        <p className={cx(
-          level === 'ok' && 'text-stone-500',
-          level === 'warn' && 'text-amber-700',
-          level === 'error' && 'text-red-700',
-        )}>
-          {length.toLocaleString()} characters.{' '}
-          {level === 'ok' && 'Comfortably within what browsers and chat apps accept.'}
-          {level === 'warn' &&
-            'Getting long — some chat apps truncate links this size. Consider exporting a PDF instead.'}
-          {level === 'error' &&
-            'Too long for most browsers. Trim annotations or share an exported PDF.'}
-        </p>
-        <p className="text-stone-500">
-          Scripture text, both translations, every annotation and its coordinates,
-          tags, panel notes and your view settings are compressed into the fragment
-          after <code className="rounded bg-stone-100 px-1 font-mono text-[11px]">#s=</code>.
-          Opening the link rebuilds the board exactly.
-        </p>
-      </div>
+      <p className="text-sm text-stone-600">
+        Your draft saves in this browser. A share link is generated only when you
+        click Copy link; your address bar stays at the base URL.
+      </p>
+      <p className="mt-3 text-xs text-stone-500">
+        Free short links use is.gd, which stores the full snapshot link, including
+        your notes. Anyone with the link can open that snapshot. If shortening is
+        unavailable or the study is too large, you’ll get the full link instead.
+      </p>
+      {url && <Input id="share-url-field" aria-label="Share link" readOnly value={url}
+        onFocus={(e) => e.target.select()} className="mt-4 font-mono text-xs" />}
+      {message && <p role="status" className="mt-3 text-xs text-stone-600">{message}</p>}
+      {url.length > 8000 && <p className="mt-2 text-xs text-amber-700">This full link is long; some chat apps may truncate it. A PDF export is another option.</p>}
     </Modal>
   )
 }

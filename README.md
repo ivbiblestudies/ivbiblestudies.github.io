@@ -3,7 +3,7 @@
 "Figma for inductive Bible study": a fully client-side canvas for manuscript
 work. Load a passage, mark it up on an infinite board, work the four movements of
 inductive study in the sidebar, and hand the whole thing to someone else as a
-link. No backend, no database, no account — the URL *is* the document.
+link. No application backend or account; drafts save in your browser.
 
 ```bash
 npm install
@@ -87,10 +87,16 @@ claim?* — that drop into your writing area.
 multi-page PDF combining the canvas map with every note and panel as selectable
 text. All rendered in the browser.
 
-**Sharing.** The entire document — scripture text, both translations, every
-annotation with its coordinates and colors, tags, panel prose and view settings —
-is JSON, compressed with `lz-string` and encoded into the URL fragment. Opening a
-link rebuilds the board exactly, offline, with no fetch.
+**Saving and sharing.** Editing saves the current draft in localStorage and keeps
+the address bar at the base URL. Refreshing restores that draft. **Share → Copy
+link** creates a compressed snapshot of the scripture, annotations, tags, panel
+prose and view settings, then requests a free short link from is.gd. The shortener
+stores the full snapshot link, including notes; anyone with the link can open it.
+Links above is.gd's 5,000-character limit, local preview links, and service failures
+fall back to the full `#s=...` link. Opening a shared link (including legacy `?s=`
+links) loads and saves its snapshot locally, then clears the address to the base
+URL. Short links require internet access to redirect. Clear browser site data to
+remove the local draft; copying the base URL alone does not share your study.
 
 ### Keyboard
 
@@ -138,7 +144,7 @@ React 19 · Vite · Tailwind CSS v4 · react-konva · zustand · lz-string · js
 
 ```
 src/
-  App.jsx                 layout, URL hydration/sync, global shortcuts
+  App.jsx                 layout, shared-link hydration, local saving, shortcuts
   store.js                the document model, history, quick-entry pipeline
   components/
     canvas/               Konva stage, scripture columns, notes, shapes, overlays

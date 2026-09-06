@@ -1,14 +1,14 @@
-import {
+import LZString from 'lz-string'
+const {
   compressToEncodedURIComponent,
   decompressFromEncodedURIComponent,
-} from 'lz-string'
+} = LZString
 
-// The whole study lives in the URL. No backend, no database — a link is the
-// document. lz-string's URI-safe codec keeps the payload legal in a query
-// string; we hang it off the hash so GitHub Pages never sees it.
+// Drafts stay in this browser. Share snapshots are encoded only on request.
 
 export const STATE_KEY = 's'
 export const SCHEMA_VERSION = 1
+export const DRAFT_KEY = 'fable.study.draft.v1'
 
 export function encodeState(doc) {
   return compressToEncodedURIComponent(JSON.stringify(doc))
@@ -35,22 +35,32 @@ export function readStateFromLocation(loc = window.location) {
 }
 
 export function buildShareUrl(doc, loc = window.location) {
-  const base = `${loc.origin}${loc.pathname}${loc.search}`
+  const base = `${loc.origin}${loc.pathname}`
   return `${base}#${STATE_KEY}=${encodeState(doc)}`
 }
 
-/** Rewrite the address bar without adding a history entry. */
-export function syncLocation(doc) {
-  const payload = encodeState(doc)
-  const url = `${window.location.pathname}${window.location.search}#${STATE_KEY}=${payload}`
-  window.history.replaceState(null, '', url)
-  return payload.length
+export function readLocalDraft(storage) {
+  try {
+    const doc = JSON.parse((storage || window.localStorage).getItem(DRAFT_KEY))
+    return doc && typeof doc === 'object' && !Array.isArray(doc) ? doc : null
+  } catch {
+    return null
+  }
+}
+
+export function saveLocalDraft(doc, storage) {
+  try {
+    (storage || window.localStorage).setItem(DRAFT_KEY, JSON.stringify(doc))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function clearLocationState() {
   window.history.replaceState(
     null,
     '',
-    `${window.location.pathname}${window.location.search}`,
+    window.location.pathname,
   )
 }
