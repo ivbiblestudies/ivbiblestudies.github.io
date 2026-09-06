@@ -122,7 +122,6 @@ export default function SettingsModal() {
   const openSettings = useStudy((s) => s.openSettings)
   const scripture = useStudy((s) => s.scripture)
   const setReference = useStudy((s) => s.setReference)
-  const toggleParallel = useStudy((s) => s.toggleParallel)
   const loadPassage = useStudy((s) => s.loadPassage)
   const style = useStudy((s) => s.style)
   const setStyle = useStudy((s) => s.setStyle)
@@ -182,22 +181,6 @@ export default function SettingsModal() {
             description="The manuscript you'll mark up."
           />
 
-          <div className="rounded-xl border border-stone-200 p-3">
-            <Toggle
-              checked={scripture.parallel}
-              onChange={toggleParallel}
-              label="Parallel view"
-              description="Show a second translation side by side on the canvas."
-            />
-          </div>
-
-          {scripture.parallel && (
-            <SlotEditor
-              slot="secondary"
-              title="Second column"
-              description="Compare renderings word for word."
-            />
-          )}
         </div>
       )}
 

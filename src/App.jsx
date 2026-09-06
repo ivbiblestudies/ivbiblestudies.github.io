@@ -12,8 +12,9 @@ import MovablePanel from './components/MovablePanel'
 
 const TOOL_KEYS = {
   v: 'select',
-  h: 'hand',
   b: 'box',
+  c: 'circle',
+  e: 'ellipse',
   g: 'highlight',
   a: 'arrow',
   t: 'text',

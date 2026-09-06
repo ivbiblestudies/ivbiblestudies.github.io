@@ -36,7 +36,7 @@ function dotPattern() {
   return c
 }
 
-const DRAW_TOOLS = new Set(['box', 'highlight', 'arrow'])
+const DRAW_TOOLS = new Set(['box', 'circle', 'ellipse', 'highlight', 'arrow'])
 const CLICK_TOOLS = new Set(['text', 'note'])
 
 export default function CanvasStage() {
@@ -123,16 +123,6 @@ export default function CanvasStage() {
         layout: layoutPassage(primary.verses, style),
         label: primary.loadedTranslation || translationShort(primary.translation),
         reference: primary.loadedReference || scripture.reference,
-      })
-    }
-    if (scripture.parallel && scripture.secondary.verses?.length) {
-      cols.push({
-        slot: 'secondary',
-        layout: layoutPassage(scripture.secondary.verses, style),
-        label:
-          scripture.secondary.loadedTranslation ||
-          translationShort(scripture.secondary.translation),
-        reference: scripture.secondary.loadedReference || scripture.reference,
       })
     }
     return cols
@@ -339,7 +329,7 @@ export default function CanvasStage() {
 
     // Middle mouse and space-drag always pan, whatever the tool.
     const wantsPan =
-      e.evt?.button === 1 || panRef.current?.spaceHeld || tool === 'hand'
+      e.evt?.button === 1 || panRef.current?.spaceHeld
 
     if (wantsPan || (tool === 'select' && isBackground(e))) {
       panRef.current = {
@@ -454,12 +444,13 @@ export default function CanvasStage() {
         setSelected(id)
       }
     } else if (width > 8 && height > 8) {
+      const size = draft.type === 'circle' ? Math.max(width, height) : null
       const id = addShape({
         type: draft.type,
-        x,
-        y,
-        width,
-        height,
+        x: size ? (draft.x < draft.startX ? draft.startX - size : draft.startX) : x,
+        y: size ? (draft.y < draft.startY ? draft.startY - size : draft.startY) : y,
+        width: size || width,
+        height: size || height,
         color: ui.color,
         strokeWidth: ui.strokeWidth,
         opacity: draft.type === 'highlight' ? 0.3 : 1,
@@ -678,13 +669,11 @@ export default function CanvasStage() {
     ? [...hoveredHighlightNotes, hoveredNoteId].filter(Boolean) : [])
 
   const cursor =
-    tool === 'hand'
-      ? 'grab'
-      : DRAW_TOOLS.has(tool)
-        ? 'crosshair'
-        : CLICK_TOOLS.has(tool)
-          ? 'copy'
-          : 'default'
+    DRAW_TOOLS.has(tool)
+      ? 'crosshair'
+      : CLICK_TOOLS.has(tool)
+        ? 'copy'
+        : 'default'
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[#faf7f2]" style={{ cursor }}>

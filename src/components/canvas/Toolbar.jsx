@@ -5,8 +5,9 @@ import { cx } from '../ui'
 import MovablePanel from '../MovablePanel'
 import {
   IconCursor,
-  IconHand,
   IconBox,
+  IconCircle,
+  IconEllipse,
   IconHighlighter,
   IconArrow,
   IconText,
@@ -15,8 +16,9 @@ import {
 
 const TOOLS = [
   { id: 'select', label: 'Select / move', key: 'V', Icon: IconCursor },
-  { id: 'hand', label: 'Pan', key: 'H', Icon: IconHand },
   { id: 'box', label: 'Draw box', key: 'B', Icon: IconBox },
+  { id: 'circle', label: 'Draw circle', key: 'C', Icon: IconCircle },
+  { id: 'ellipse', label: 'Draw ellipse', key: 'E', Icon: IconEllipse },
   { id: 'highlight', label: 'Highlighter', key: 'G', Icon: IconHighlighter },
   { id: 'arrow', label: 'Arrow', key: 'A', Icon: IconArrow },
   { id: 'text', label: 'Add text', key: 'T', Icon: IconText },

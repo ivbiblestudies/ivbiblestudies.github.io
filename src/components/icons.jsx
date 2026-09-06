@@ -27,6 +27,18 @@ export const IconBox = (p) => (
   </svg>
 )
 
+export const IconCircle = (p) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="7.5" />
+  </svg>
+)
+
+export const IconEllipse = (p) => (
+  <svg {...base} {...p}>
+    <ellipse cx="12" cy="12" rx="8.5" ry="5.5" />
+  </svg>
+)
+
 export const IconHighlighter = (p) => (
   <svg {...base} {...p}>
     <path d="M14 4l6 6-8.5 8.5H6l-1.5-3z" />

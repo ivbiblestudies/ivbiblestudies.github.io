@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Rect, Arrow, Text } from 'react-konva'
+import { Rect, Arrow, Ellipse, Text } from 'react-konva'
 
 /**
  * Freehand annotation primitives: boxes, highlighter swipes, arrows and text.
@@ -70,6 +70,41 @@ function ShapeNode({ shape, selected, onSelect, onChange, onEdit, draggable = tr
             y: node.y(),
             width: Math.max(6, node.width() * node.scaleX()),
             height: Math.max(6, node.height() * node.scaleY()),
+          })
+          node.scaleX(1)
+          node.scaleY(1)
+        }}
+      />
+    )
+  }
+
+  if (shape.type === 'circle' || shape.type === 'ellipse') {
+    const width = shape.width || 40
+    const height = shape.height || 40
+    return (
+      <Ellipse
+        {...common}
+        x={shape.x + width / 2}
+        y={shape.y + height / 2}
+        radiusX={width / 2}
+        radiusY={height / 2}
+        stroke={shape.color}
+        strokeWidth={shape.strokeWidth || 3}
+        fill="rgba(0,0,0,0.001)"
+        dash={shape.dash ? [10, 6] : undefined}
+        onDragEnd={(e) => onChange?.(shape.id, {
+          x: e.target.x() - width / 2,
+          y: e.target.y() - height / 2,
+        })}
+        onTransformEnd={(e) => {
+          const node = e.target
+          const nextWidth = Math.max(8, width * node.scaleX())
+          const nextHeight = Math.max(8, height * node.scaleY())
+          onChange?.(shape.id, {
+            x: node.x() - nextWidth / 2,
+            y: node.y() - nextHeight / 2,
+            width: nextWidth,
+            height: nextHeight,
           })
           node.scaleX(1)
           node.scaleY(1)

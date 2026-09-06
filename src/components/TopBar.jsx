@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useStudy } from '../store'
 import { clearLocationState } from '../lib/urlState'
-import { Button, Modal, cx } from './ui'
+import { Button, Modal } from './ui'
 import { IconSettings, IconExport, IconLink, IconUndo, IconRedo, IconPlus } from './icons'
 
 export default function TopBar() {
   const title = useStudy((s) => s.title)
   const setTitle = useStudy((s) => s.setTitle)
   const scripture = useStudy((s) => s.scripture)
-  const toggleParallel = useStudy((s) => s.toggleParallel)
   const openSettings = useStudy((s) => s.openSettings)
   const openExport = useStudy((s) => s.openExport)
   const openShare = useStudy((s) => s.openShare)
@@ -70,32 +69,6 @@ export default function TopBar() {
       </button>
 
       <div className="ml-auto flex items-center gap-1">
-        <button
-          type="button"
-          onClick={toggleParallel}
-          aria-pressed={scripture.parallel}
-          title="Toggle parallel translation"
-          className={cx(
-            'hidden h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors sm:flex',
-            scripture.parallel
-              ? 'border-stone-900 bg-stone-900 text-white'
-              : 'border-stone-300 text-stone-600 hover:border-stone-400 hover:text-stone-900',
-          )}
-        >
-          <span className="flex gap-0.5">
-            <span className="block h-3 w-1 rounded-[1px] bg-current opacity-90" />
-            <span
-              className={cx(
-                'block h-3 w-1 rounded-[1px] bg-current',
-                scripture.parallel ? 'opacity-90' : 'opacity-30',
-              )}
-            />
-          </span>
-          Parallel
-        </button>
-
-        <span className="mx-1 hidden h-5 w-px bg-stone-200 sm:block" />
-
         <button
           type="button"
           onClick={undo}
