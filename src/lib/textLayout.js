@@ -23,7 +23,7 @@ export const DEFAULT_STYLE = {
   letterSpacing: 0,
   wordSpacing: 4,
   verseSpacing: 10,
-  columnWidth: 520,
+  columnWidth: 790,
   verseOnNewLine: true,
   showVerseNumbers: true,
   textColor: '#1c1917',

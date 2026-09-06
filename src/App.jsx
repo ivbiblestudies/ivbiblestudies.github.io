@@ -63,6 +63,7 @@ export default function App() {
   const studyHidden = useStudy((s) => !!s.ui.studyHidden)
   const setUI = useStudy((s) => s.setUI)
   const loadDoc = useStudy((s) => s.loadDoc)
+  const loadPassage = useStudy((s) => s.loadPassage)
   const undo = useStudy((s) => s.undo)
   const redo = useStudy((s) => s.redo)
   const setTool = useStudy((s) => s.setTool)
@@ -108,6 +109,8 @@ export default function App() {
         new URLSearchParams(window.location.search).has('s')
       const draft = shared || readLocalDraft()
       if (draft) loadDoc(draft, { shared: !!shared })
+      const primary = useStudy.getState().scripture.primary
+      if (primary.mode === 'api' && !primary.verses?.length) loadPassage('primary')
       clearLocationState()
       if (hadSharedPayload && !shared) {
         useStudy.getState().setNotice('The shared link could not be opened. Your local draft was kept. Try the link in a current browser.')
@@ -123,7 +126,7 @@ export default function App() {
       window.removeEventListener('pagehide', flushSave)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [loadDoc])
+  }, [loadDoc, loadPassage])
 
   // Global shortcuts.
   useEffect(() => {
