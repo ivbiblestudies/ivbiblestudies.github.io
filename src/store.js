@@ -39,13 +39,13 @@ export const emptyDoc = () => ({
   v: SCHEMA_VERSION,
   title: 'Untitled study',
   scripture: {
-    reference: 'John 1:1-5',
+    reference: 'Luke 7:1-10',
     parallel: false,
     primary: {
       mode: 'api',
-      translation: 'web',
-      loadedReference: 'John 1:1-5',
-      loadedTranslation: 'World English Bible (sample)',
+      translation: 'NIV',
+      loadedReference: 'Luke 7:1-10',
+      loadedTranslation: 'New International Version',
       customText: '',
       verses: SAMPLE_VERSES,
     },
