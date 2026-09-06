@@ -5,7 +5,7 @@ import { useStudy, visibleNotes, visibleShapes } from '../../store'
 import { layoutPassage, connectorBox } from '../../lib/textLayout'
 import { highlightNotesAt } from '../../lib/connections'
 import { frameUpdate } from '../../lib/frameUpdate'
-import { inViewport } from '../../lib/viewport'
+import { inViewport, canvasSize } from '../../lib/viewport'
 import { publishLayout } from '../../lib/layoutRegistry'
 import { registerCanvasApi } from '../../lib/canvasApi'
 import { useFontEpoch } from '../../lib/useFonts'
@@ -49,7 +49,9 @@ export default function CanvasStage() {
   const bgDotsRef = useRef(null)
   const pattern = useMemo(() => dotPattern(), [])
 
-  const [size, setSize] = useState({ width: 0, height: 0 })
+  // Firefox rejects drawImage from a zero-sized Konva compositing buffer.
+  // Layers can draw before ResizeObserver delivers the first measurement.
+  const [size, setSize] = useState(() => canvasSize(0, 0))
   const [draft, setDraft] = useState(null)
   const [wordSelection, setWordSelection] = useState(null)
   const [hoveredNoteId, setHoveredNoteId] = useState(null)
@@ -159,7 +161,7 @@ export default function CanvasStage() {
     if (!el) return
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
-      setSize({ width: Math.max(1, width), height: Math.max(1, height) })
+      setSize(canvasSize(width, height))
     })
     ro.observe(el)
     return () => ro.disconnect()
