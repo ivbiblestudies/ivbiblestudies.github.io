@@ -1,15 +1,17 @@
 import { memo } from 'react'
-import { Rect, Arrow, Ellipse, Text } from 'react-konva'
+import { Rect, Arrow, Ellipse, Text, Line } from 'react-konva'
+import { polygonPoints } from '../../lib/shapeGeometry'
 
 /**
  * Freehand annotation primitives: boxes, highlighter swipes, arrows and text.
  * Each is a single Konva node so the Transformer can grab it directly.
  */
-function ShapeNode({ shape, selected, onSelect, onChange, onEdit, draggable = true }) {
+function ShapeNode({ shape, selected, onSelect, onChange, onEdit, draggable = true, listening = true }) {
   const common = {
     id: shape.id,
     name: 'shape',
     draggable,
+    listening,
     onClick: () => onSelect?.(shape.id),
     onTap: () => onSelect?.(shape.id),
     onDragEnd: (e) => onChange?.(shape.id, { x: e.target.x(), y: e.target.y() }),
@@ -21,6 +23,22 @@ function ShapeNode({ shape, selected, onSelect, onChange, onEdit, draggable = tr
       const c = e.target.getStage()?.container()
       if (c) c.style.cursor = ''
     },
+  }
+
+  if (shape.type === 'triangle' || shape.type === 'diamond') {
+    return <Line {...common} x={shape.x} y={shape.y}
+      points={polygonPoints(shape.type, shape.width, shape.height)} closed
+      stroke={shape.color} strokeWidth={shape.strokeWidth || 3}
+      fill="rgba(0,0,0,0.001)" lineJoin="round"
+      dash={shape.dash ? [10, 6] : undefined}
+      onTransformEnd={(e) => {
+        const node = e.target
+        onChange?.(shape.id, { x: node.x(), y: node.y(),
+          width: Math.max(8, shape.width * node.scaleX()),
+          height: Math.max(8, shape.height * node.scaleY()) })
+        node.scaleX(1)
+        node.scaleY(1)
+      }} />
   }
 
   if (shape.type === 'box') {

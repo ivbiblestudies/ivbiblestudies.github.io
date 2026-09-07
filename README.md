@@ -24,7 +24,7 @@ side. Every word is laid out and measured individually for phrase selection and 
 is fully adjustable: family, size, line height, letter and word spacing, verse
 spacing, column width.
 
-**Annotation.** A docked rail on the left of the canvas: select, pan, box,
+**Annotation.** A docked rail on the left of the canvas: select, box, circle, ellipse, triangle, diamond,
 highlighter, arrow, text and sticky note, plus tag and color pickers. Anything you
 create can be tagged **Observation** (teal), **Question** (violet) or
 **Application** (orange).
@@ -114,7 +114,7 @@ including Firefox.
 
 | | |
 |---|---|
-| `V` `H` `B` `G` `A` `T` `N` | select, pan, box, highlighter, arrow, text, note |
+| `V` `B` `C` `E` `R` `D` `G` `A` `T` `N` | select, box, circle, ellipse, triangle, diamond, highlighter, arrow, text, note |
 | double-click a note | edit its title and body |
 | drag a note's corner | resize it |
 | scroll | zoom to cursor |

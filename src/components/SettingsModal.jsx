@@ -127,8 +127,6 @@ export default function SettingsModal() {
   const setStyle = useStudy((s) => s.setStyle)
   const ui = useStudy((s) => s.ui)
   const setUI = useStudy((s) => s.setUI)
-  const layer = useStudy((s) => s.layer)
-  const setLayer = useStudy((s) => s.setLayer)
   const error = useStudy((s) => s.error)
 
   const [tab, setTab] = useState('scripture')
@@ -303,19 +301,8 @@ export default function SettingsModal() {
             label="Dot grid"
             description="Subtle alignment guide behind the canvas."
           />
-          <Divider label="Layout" />
-          <div className="grid grid-cols-2 gap-4">
-            <Range
-              label="Gap between columns"
-              suffix="px"
-              min={24}
-              max={200}
-              value={layer.gap}
-              onChange={(gap) => setLayer({ gap }, { history: false })}
-            />
-          </div>
           <p className={cx('text-[11px] text-stone-400')}>
-            Scroll to zoom at the cursor, shift-scroll or space-drag to pan.
+            Scroll to zoom, shift-scroll or space-drag to pan. On touchscreens, use two fingers to pan and pinch to zoom.
           </p>
         </div>
       )}

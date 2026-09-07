@@ -8,6 +8,8 @@ import {
   IconBox,
   IconCircle,
   IconEllipse,
+  IconTriangle,
+  IconDiamond,
   IconHighlighter,
   IconArrow,
   IconText,
@@ -19,6 +21,8 @@ const TOOLS = [
   { id: 'box', label: 'Draw box', key: 'B', Icon: IconBox },
   { id: 'circle', label: 'Draw circle', key: 'C', Icon: IconCircle },
   { id: 'ellipse', label: 'Draw ellipse', key: 'E', Icon: IconEllipse },
+  { id: 'triangle', label: 'Draw triangle', key: 'R', Icon: IconTriangle },
+  { id: 'diamond', label: 'Draw diamond', key: 'D', Icon: IconDiamond },
   { id: 'highlight', label: 'Highlighter', key: 'G', Icon: IconHighlighter },
   { id: 'arrow', label: 'Arrow', key: 'A', Icon: IconArrow },
   { id: 'text', label: 'Add text', key: 'T', Icon: IconText },
@@ -45,10 +49,10 @@ function Flyout({ open, onClose, children, label }) {
       if (ref.current && !ref.current.contains(e.target)) onClose()
     }
     const onKey = (e) => e.key === 'Escape' && onClose()
-    document.addEventListener('mousedown', onDown)
+    document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])
@@ -58,7 +62,7 @@ function Flyout({ open, onClose, children, label }) {
     <div
       ref={ref}
       aria-label={label}
-      className="animate-fade-in absolute left-[calc(100%+8px)] top-0 z-30 rounded-xl border border-stone-200 bg-white p-2 shadow-xl shadow-stone-900/10"
+      className="tool-flyout animate-fade-in absolute left-[calc(100%+8px)] top-0 z-30 rounded-xl border border-stone-200 bg-white p-2 shadow-xl shadow-stone-900/10"
     >
       {children}
     </div>

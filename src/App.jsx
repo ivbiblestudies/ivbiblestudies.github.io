@@ -15,6 +15,8 @@ const TOOL_KEYS = {
   b: 'box',
   c: 'circle',
   e: 'ellipse',
+  r: 'triangle',
+  d: 'diamond',
   g: 'highlight',
   a: 'arrow',
   t: 'text',
@@ -181,7 +183,7 @@ export default function App() {
         {/* 70 / 30 split: the manuscript gets the room, the method gets the margin.
             The sidebar owns the 30% and its own minimum; the canvas takes whatever
             is left, so a narrow window never forces the page to scroll sideways. */}
-        <div className={`relative min-w-0 flex-1 ${studyHidden ? 'min-h-0' : 'min-h-[45vh] lg:min-h-0'}`}>
+        <div className={`relative min-w-0 flex-1 ${studyHidden ? 'min-h-0' : 'min-h-[35dvh] lg:min-h-0'}`}>
           <CanvasStage />
         </div>
         <MovablePanel label="Study panel" docked hidden={studyHidden} width={380} resizable onHide={() => setUI({ studyHidden: true }, { history: false })}>

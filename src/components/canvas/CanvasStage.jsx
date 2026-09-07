@@ -6,6 +6,8 @@ import { layoutPassage, connectorBox } from '../../lib/textLayout'
 import { highlightNotesAt } from '../../lib/connections'
 import { frameUpdate } from '../../lib/frameUpdate'
 import { inViewport, canvasSize } from '../../lib/viewport'
+import { pinchViewport } from '../../lib/touchViewport'
+import { shapeBounds } from '../../lib/shapeGeometry'
 import { publishLayout } from '../../lib/layoutRegistry'
 import { registerCanvasApi } from '../../lib/canvasApi'
 import { useFontEpoch } from '../../lib/useFonts'
@@ -36,12 +38,13 @@ function dotPattern() {
   return c
 }
 
-const DRAW_TOOLS = new Set(['box', 'circle', 'ellipse', 'highlight', 'arrow'])
+const DRAW_TOOLS = new Set(['box', 'circle', 'ellipse', 'triangle', 'diamond', 'highlight', 'arrow'])
 const CLICK_TOOLS = new Set(['text', 'note'])
 
 export default function CanvasStage() {
   const containerRef = useRef(null)
   const stageRef = useRef(null)
+  const pinchRef = useRef(null)
   const trRef = useRef(null)
   const bgBaseRef = useRef(null)
   const bgDotsRef = useRef(null)
@@ -423,8 +426,6 @@ export default function CanvasStage() {
     }
     if (!draft) return
 
-    const x = Math.min(draft.startX, draft.x)
-    const y = Math.min(draft.startY, draft.y)
     const width = Math.abs(draft.x - draft.startX)
     const height = Math.abs(draft.y - draft.startY)
 
@@ -444,13 +445,9 @@ export default function CanvasStage() {
         setSelected(id)
       }
     } else if (width > 8 && height > 8) {
-      const size = draft.type === 'circle' ? Math.max(width, height) : null
       const id = addShape({
         type: draft.type,
-        x: size ? (draft.x < draft.startX ? draft.startX - size : draft.startX) : x,
-        y: size ? (draft.y < draft.startY ? draft.startY - size : draft.startY) : y,
-        width: size || width,
-        height: size || height,
+        ...shapeBounds(draft),
         color: ui.color,
         strokeWidth: ui.strokeWidth,
         opacity: draft.type === 'highlight' ? 0.3 : 1,
@@ -471,6 +468,7 @@ export default function CanvasStage() {
       if (!stage) return
       stage.find(node => node.isDragging()).forEach(node => node.stopDrag())
       nativeDragActive.current = false
+      pinchRef.current = null
       panUpdates.flush()
       noteDragUpdates.flush()
       wheelUpdates.flush()
@@ -583,6 +581,41 @@ export default function CanvasStage() {
     tr.getLayer()?.batchDraw()
   }, [selectedId, shapes, columns])
 
+  // Two fingers navigate regardless of the active drawing tool. Wait until
+  // both fingers lift before accepting another drawing or selection gesture.
+  const touchPair = (touches) => {
+    const box = containerRef.current.getBoundingClientRect()
+    const [a, b] = touches
+    return { x: (a.clientX + b.clientX) / 2 - box.left,
+      y: (a.clientY + b.clientY) / 2 - box.top,
+      distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) }
+  }
+  const onTouchStart = (event) => {
+    if (event.evt.touches.length < 2) {
+      if (!pinchRef.current) onPointerDown(event)
+      return
+    }
+    event.evt.preventDefault()
+    panUpdates.flush()
+    stageRef.current.find(node => node.isDragging()).forEach(node => node.stopDrag())
+    nativeDragActive.current = false
+    panRef.current = { ...panRef.current, active: false }
+    setDraft(null)
+    pinchRef.current = { start: touchPair(event.evt.touches), viewport: useStudy.getState().ui.viewport }
+  }
+  const onTouchMove = (event) => {
+    if (!pinchRef.current) return onPointerMove(event)
+    event.evt.preventDefault()
+    if (event.evt.touches.length < 2) return
+    const { start, viewport } = pinchRef.current
+    panUpdates.push(pinchViewport(viewport, start, touchPair(event.evt.touches)))
+  }
+  const onTouchEnd = (event) => {
+    if (!pinchRef.current) return onPointerUp()
+    panUpdates.flush()
+    if (!event.evt.touches.length) pinchRef.current = null
+  }
+
   // --- word clicks ---------------------------------------------------------
   const handleWordClick = (word, colIndex, evt) => {
     if (tool !== 'select') return
@@ -684,11 +717,11 @@ export default function CanvasStage() {
         onMouseDown={onPointerDown}
         onDragStart={() => { nativeDragActive.current = true }}
         onDragEnd={() => { nativeDragActive.current = false }}
-        onTouchStart={onPointerDown}
+        onTouchStart={onTouchStart}
         onMouseMove={onPointerMove}
-        onTouchMove={onPointerMove}
+        onTouchMove={onTouchMove}
         onMouseUp={onPointerUp}
-        onTouchEnd={onPointerUp}
+        onTouchEnd={onTouchEnd}
         onMouseLeave={() => {
           onPointerUp()
           setHoveredNoteId(null)
@@ -819,18 +852,8 @@ export default function CanvasStage() {
 
             {/* Live preview of the shape being drawn. */}
             {draft && draft.type !== 'arrow' && (
-              <Rect
-                x={Math.min(draft.startX, draft.x)}
-                y={Math.min(draft.startY, draft.y)}
-                width={Math.abs(draft.x - draft.startX)}
-                height={Math.abs(draft.y - draft.startY)}
-                stroke={draft.type === 'box' ? ui.color : undefined}
-                strokeWidth={ui.strokeWidth}
-                fill={draft.type === 'highlight' ? ui.color : undefined}
-                opacity={draft.type === 'highlight' ? 0.3 : 0.9}
-                cornerRadius={draft.type === 'box' ? 4 : 2}
-                listening={false}
-              />
+              <ShapeNode shape={{ type: draft.type, ...shapeBounds(draft),
+                color: ui.color, strokeWidth: ui.strokeWidth }} draggable={false} listening={false} />
             )}
             {draft && draft.type === 'arrow' && (
               <Arrow

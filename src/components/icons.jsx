@@ -15,10 +15,14 @@ export const IconCursor = (p) => (
   </svg>
 )
 
-export const IconHand = (p) => (
+export const IconTriangle = (p) => (
   <svg {...base} {...p}>
-    <path d="M9 11V5.5a1.5 1.5 0 013 0V11m0-.5V4.5a1.5 1.5 0 013 0V11m0-.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1a6 6 0 01-6-6v-4a1.5 1.5 0 013 0" />
+    <path d="M12 3L22 21H2Z" />
   </svg>
+)
+
+export const IconDiamond = (p) => (
+  <svg {...base} {...p}><path d="M12 2L22 12L12 22L2 12Z" /></svg>
 )
 
 export const IconBox = (p) => (

@@ -89,7 +89,7 @@ export async function exportStudyPDF(doc, { pixelRatio = 2, includeCanvas = true
   text(doc.title || 'Untitled study', { size: 22, style: 'bold', leading: 1.25 })
   text(ref, { size: 13, color: [120, 113, 108], gap: 2 })
 
-  const sources = [doc.scripture?.primary, doc.scripture?.secondary]
+  const sources = [doc.scripture?.primary]
     .filter((s) => s?.verses?.length)
     .map((s) => s.loadedTranslation || s.translation)
     .join('  ·  ')

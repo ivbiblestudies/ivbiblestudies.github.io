@@ -34,6 +34,7 @@ export const emptyDoc = () => ({
   title: 'Untitled study',
   scripture: {
     reference: 'Luke 7:1-10',
+    // Retain the v1 fields for older clients; only primary is rendered here.
     parallel: false,
     primary: {
       mode: 'api',
@@ -100,6 +101,7 @@ export function hydrateDoc(raw) {
     ui: {
       ...base.ui,
       ...(raw.ui || {}),
+      tool: ['hand', 'pan'].includes(raw.ui?.tool) ? 'select' : (raw.ui?.tool || base.ui.tool),
       viewport: { ...base.ui.viewport, ...(raw.ui?.viewport || {}) },
       tagFilter: Array.isArray(raw.ui?.tagFilter)
         ? raw.ui.tagFilter
@@ -231,9 +233,6 @@ export const useStudy = create((set, get) => {
     // --- scripture ------------------------------------------------------
     setReference: (reference) =>
       commit((s) => ({ scripture: { ...s.scripture, reference } }), { history: false }),
-
-    toggleParallel: () =>
-      commit((s) => ({ scripture: { ...s.scripture, parallel: !s.scripture.parallel } })),
 
     setSlot: (slot, patch) =>
       commit((s) => ({

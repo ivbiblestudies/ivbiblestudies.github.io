@@ -15,6 +15,8 @@
 }
 
 html, body, #root { height: 100%; }
+html, body { overflow: hidden; }
+#root { height: 100dvh; }
 
 body {
   font-family: var(--font-ui);
@@ -50,4 +52,25 @@ body {
 @media (max-height: 700px) {
   .tool-panel .h-9 { height: 26px; }
   .tool-panel { top: 4px; }
+}
+
+@media (max-width: 639px) {
+  header { height: auto !important; min-height: 56px; flex-wrap: wrap; padding: 8px !important; }
+  header > input { flex: 1; max-width: none; }
+  header > div.ml-auto { width: 100%; justify-content: flex-end; }
+  [role="dialog"] { min-width: 0; }
+  [role="dialog"] .grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+  [role="dialog"] .flex.items-end, [role="dialog"] .flex.items-start { flex-wrap: wrap; }
+  [role="dialog"] label { min-width: 0; }
+  .study-panel.panel-floating { max-height: 55%; }
+}
+
+@media (pointer: coarse) {
+  button { min-height: 44px; min-width: 44px; }
+  input:not([type="range"]), select, textarea { font-size: 16px !important; }
+  input[type="range"] { min-height: 24px; }
+  .tool-panel > div:last-child { overflow-y: auto; overflow-x: hidden; }
+  .tool-panel .h-9 { height: 44px; }
+  .tool-panel .backdrop-blur { backdrop-filter: none; }
+  .tool-flyout { position: fixed; left: 72px; top: 12px; max-width: calc(100vw - 88px); max-height: 65dvh; overflow: auto; }
 }

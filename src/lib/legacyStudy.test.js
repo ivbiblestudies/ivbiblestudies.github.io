@@ -4,19 +4,27 @@ import { createServer } from 'vite'
 import LZString from 'lz-string'
 import { encodeState, readStateFromLocation, saveLocalDraft, readLocalDraft } from './urlState.js'
 
-test('retired lookup settings remain inert through legacy links, drafts and re-sharing', async () => {
+test('legacy lookup and parallel studies retain their data through links, drafts and re-sharing', async () => {
   const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
   try {
     const { emptyDoc, hydrateDoc, pickDoc, useStudy } = await server.ssrLoadModule('/src/store.js')
     assert.equal('showStrongs' in emptyDoc().ui, false)
     assert.equal('setStrongs' in useStudy.getState(), false)
     assert.equal('strongs' in useStudy.getState(), false)
+    for (const tool of ['hand', 'pan']) {
+      assert.equal(hydrateDoc({ ui: { tool } }).ui.tool, 'select')
+    }
     for (const showStrongs of [true, false]) {
       const old = {
         v: 1, title: 'Older study',
-        scripture: { primary: { verses: [{ verse: 1, text: 'In the beginning' }] } },
+        scripture: {
+          parallel: true,
+          primary: { verses: [{ verse: 1, text: 'In the beginning' }] },
+          secondary: { translation: 'KJV', verses: [{ verse: 1, text: 'An older second passage' }] },
+        },
         notes: [{ id: 'n1', text: 'A note', x: 10, y: 20 }],
-        connectors: [{ id: 'c1', noteId: 'n1', verse: 1, startWord: 0, endWord: 2 }],
+        connectors: [{ id: 'c1', noteId: 'n1', verse: 1, startWord: 0, endWord: 2 },
+          { id: 'c2', noteId: 'n1', verse: 1, column: 1 }],
         ui: { showStrongs, showGrid: false, viewport: { x: 20, y: 30, scale: 2 } },
       }
       const payloads = [LZString.compressToEncodedURIComponent(JSON.stringify(old)), await encodeState(old)]
@@ -29,6 +37,8 @@ test('retired lookup settings remain inert through legacy links, drafts and re-s
           assert.deepEqual(restored.notes, old.notes)
           assert.deepEqual(restored.connectors, old.connectors)
           assert.deepEqual(restored.scripture.primary.verses, old.scripture.primary.verses)
+          assert.deepEqual(restored.scripture.secondary.verses, old.scripture.secondary.verses)
+          assert.equal(restored.scripture.parallel, true)
           assert.deepEqual(restored.ui.viewport, old.ui.viewport)
           assert.equal(restored.v, 1)
           const values = new Map()
