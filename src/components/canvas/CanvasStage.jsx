@@ -8,6 +8,8 @@ import { frameUpdate } from '../../lib/frameUpdate'
 import { inViewport, canvasSize } from '../../lib/viewport'
 import { pinchViewport } from '../../lib/touchViewport'
 import { shapeBounds } from '../../lib/shapeGeometry'
+import { nearestWord, selectWords } from '../../lib/textSelection'
+import TextSelectionToolbar from './TextSelectionToolbar'
 import { publishLayout } from '../../lib/layoutRegistry'
 import { registerCanvasApi } from '../../lib/canvasApi'
 import { useFontEpoch } from '../../lib/useFonts'
@@ -55,6 +57,9 @@ export default function CanvasStage() {
   const [size, setSize] = useState(() => canvasSize(0, 0))
   const [draft, setDraft] = useState(null)
   const [wordSelection, setWordSelection] = useState(null)
+  const [textSelection, setTextSelection] = useState(null)
+  const textDrag = useRef(null)
+  const clearTextSelection = () => { textDrag.current = null; setTextSelection(null) }
   const [hoveredNoteId, setHoveredNoteId] = useState(null)
   const [hoveredHighlightNotes, setHoveredHighlightNotes] = useState([])
   const panRef = useRef(null)
@@ -99,6 +104,13 @@ export default function CanvasStage() {
 
   const vp = ui.viewport
   const tool = ui.tool
+
+  useEffect(() => { clearTextSelection() }, [tool, scripture])
+  useEffect(() => {
+    const cancel = event => { if (event.key === 'Escape') clearTextSelection() }
+    window.addEventListener('keydown', cancel)
+    return () => window.removeEventListener('keydown', cancel)
+  }, [])
 
   useEffect(() => {
     setWordSelection(null)
@@ -268,12 +280,15 @@ export default function CanvasStage() {
 
       // Export all text at the requested resolution, including offscreen tiles.
       const tiles = [...stage.find('.scripture-tile'), ...stage.find('.note')].map(node => ({ node, visible: node.visible(), cached: node.isCached() }))
+      const previews = stage.find('.text-selection-preview').map(node => ({ node, visible: node.visible() }))
       let dataUrl
       try {
+        previews.forEach(({ node }) => node.visible(false))
         tiles.forEach(({ node }) => { node.visible(true); node.clearCache() })
         stage.draw()
         dataUrl = stage.toDataURL({ pixelRatio, mimeType: 'image/png' })
       } finally {
+        previews.forEach(({ node, visible }) => node.visible(visible))
         tiles.forEach(({ node, visible, cached }) => {
           node.visible(visible)
           if (cached) node.cache({ pixelRatio: node.getAttr('cacheRatio'), hitCanvasPixelRatio: 1, offset: 4 })
@@ -333,6 +348,19 @@ export default function CanvasStage() {
     // Middle mouse and space-drag always pan, whatever the tool.
     const wantsPan =
       e.evt?.button === 1 || panRef.current?.spaceHeld
+
+    if (!wantsPan && tool === 'select' && !wordSelection &&
+      (e.evt?.button == null || e.evt.button === 0) && e.target.findAncestor('.scripture-tile')) {
+      const layout = columns[0]?.layout
+      const word = layout && nearestWord(layout, { x: world.x - layer.x, y: world.y - layer.y })
+      if (word) {
+        setSelected(null)
+        textDrag.current = { first: word, last: word }
+        setTextSelection({ ...selectWords(layout, word, word), dragging: true })
+        return
+      }
+    }
+    if (!wordSelection) clearTextSelection()
 
     if (wantsPan || (tool === 'select' && isBackground(e))) {
       panRef.current = {
@@ -399,6 +427,16 @@ export default function CanvasStage() {
     const pos = stage?.getPointerPosition()
     if (!pos) return
 
+    if (textDrag.current) {
+      const world = toWorld(pos)
+      const word = nearestWord(columns[0].layout, { x: world.x - layer.x, y: world.y - layer.y })
+      if (word && word !== textDrag.current.last) {
+        textDrag.current.last = word
+        setTextSelection({ ...selectWords(columns[0].layout, textDrag.current.first, word), dragging: true })
+      }
+      return
+    }
+
     if (panRef.current?.active) {
       const p = panRef.current
       const dx = pos.x - p.startX
@@ -419,6 +457,11 @@ export default function CanvasStage() {
   }
 
   const onPointerUp = () => {
+    if (textDrag.current) {
+      textDrag.current = null
+      setTextSelection(current => current && ({ ...current, dragging: false }))
+      return
+    }
     if (panRef.current?.active) {
       panUpdates.flush()
       panRef.current = { ...panRef.current, active: false }
@@ -469,6 +512,8 @@ export default function CanvasStage() {
       stage.find(node => node.isDragging()).forEach(node => node.stopDrag())
       nativeDragActive.current = false
       pinchRef.current = null
+      textDrag.current = null
+      setTextSelection(null)
       panUpdates.flush()
       noteDragUpdates.flush()
       wheelUpdates.flush()
@@ -596,6 +641,7 @@ export default function CanvasStage() {
       return
     }
     event.evt.preventDefault()
+    clearTextSelection()
     panUpdates.flush()
     stageRef.current.find(node => node.isDragging()).forEach(node => node.stopDrag())
     nativeDragActive.current = false
@@ -697,6 +743,15 @@ export default function CanvasStage() {
   }, [connectors, notes, columns, columnX, layer.y, customTags])
 
   const previewRange = wordSelection?.range
+  const selectedRegions = (textSelection?.ranges || []).flatMap(range => {
+    const box = connectorBox(columns[0]?.layout, range)
+    if (!box?.lines.length) return []
+    const left = Math.min(...box.lines.map(line => line.x))
+    const top = Math.min(...box.lines.map(line => line.y))
+    return [{ range, lines: box.lines, x: layer.x + left, y: layer.y + top,
+      width: Math.max(...box.lines.map(line => line.x + line.width)) - left,
+      height: Math.max(...box.lines.map(line => line.y + line.height)) - top }]
+  })
   const previewBox = previewRange && connectorBox(columns[previewRange.column]?.layout, previewRange)
   const activeConnectionNotes = new Set(tool === 'select' && !wordSelection
     ? [...hoveredHighlightNotes, hoveredNoteId].filter(Boolean) : [])
@@ -778,6 +833,12 @@ export default function CanvasStage() {
                 opacity={0.35} cornerRadius={3} listening={false} />
             ))}
 
+            {selectedRegions.flatMap((region, regionIndex) => region.lines.map((line, index) => (
+              <Rect key={`selection-${regionIndex}-${index}`} name="text-selection-preview"
+                x={layer.x + line.x} y={layer.y + line.y} width={line.width} height={line.height}
+                fill="#60a5fa" opacity={textSelection.color ? 0 : 0.3} listening={false} />
+            )))}
+
             {connectorLines.map((c) =>
               c.style === 'highlight' ? (
                 <Group key={c.id} name="connection-highlight" listening={false}>
@@ -820,7 +881,15 @@ export default function CanvasStage() {
               ),
             )}
 
-            {shapes.map((shape) => (
+            {shapes.map((shape) => shape.wordRange ? (
+              <Group key={shape.id} name="word-highlight" listening={false}>
+                {connectorBox(columns[shape.wordRange.column ?? 0]?.layout, shape.wordRange)?.lines.map((line, index) => (
+                  <Rect key={index} x={columnX(shape.wordRange.column ?? 0) + line.x}
+                    y={layer.y + line.y} width={line.width} height={line.height}
+                    fill={shape.color} opacity={shape.opacity ?? 0.3} />
+                ))}
+              </Group>
+            ) : (
               <ShapeNode
                 key={shape.id}
                 shape={shape}
@@ -888,8 +957,35 @@ export default function CanvasStage() {
       </Stage>
 
       <Toolbar />
+      {textSelection && !textSelection.dragging && selectedRegions.length > 0 && <TextSelectionToolbar
+        text={textSelection.text} color={textSelection.color}
+        bounds={size}
+        anchor={{
+          left: vp.x + Math.min(...selectedRegions.map(region => region.x)) * vp.scale,
+          right: vp.x + Math.max(...selectedRegions.map(region => region.x + region.width)) * vp.scale,
+          top: vp.y + Math.min(...selectedRegions.map(region => region.y)) * vp.scale,
+          bottom: vp.y + Math.max(...selectedRegions.map(region => region.y + region.height)) * vp.scale,
+        }}
+        onClose={clearTextSelection}
+        onRemoveHighlight={() => {
+          useStudy.getState().removeSelectionHighlights(textSelection.ranges)
+          setTextSelection(current => current && ({ ...current, color: null, highlightIds: [] }))
+        }}
+        onHighlight={color => {
+          const regions = selectedRegions.map(({ lines, ...region }) => region)
+          const ids = useStudy.getState().highlightSelection(regions, color, textSelection.highlightIds)
+          setTextSelection(current => current && ({ ...current, color, highlightIds: ids }))
+        }}
+        onNote={() => {
+          const position = {
+            x: layer.x + style.columnWidth + 36, y: selectedRegions[0]?.y ?? layer.y,
+          }
+          useStudy.getState().addConnectedNote(textSelection.ranges, position)
+          centerOn(position.x + 140, position.y + 70)
+          clearTextSelection()
+        }} />}
       <ZoomControls scale={vp.scale} onZoom={zoomBy} onFit={() => fitToContent()} />
-      {!wordSelection && <SelectionPopover bounds={size} onSelectWords={(noteId) => {
+      {!wordSelection && !textSelection && <SelectionPopover bounds={size} onSelectWords={(noteId) => {
         setTool('select')
         panRef.current = null
         setWordSelection({ noteId, range: null })

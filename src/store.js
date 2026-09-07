@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { uid } from './lib/id'
 import { appendHighlight } from './lib/connections'
+import { subtractWordRanges } from './lib/highlightEditing'
 import { DEFAULT_STYLE } from './lib/textLayout'
 import { readLayout } from './lib/layoutRegistry'
 import { NOTE_WIDTH, noteHeight } from './lib/noteMetrics'
@@ -318,6 +319,41 @@ export const useStudy = create((set, get) => {
 
     removeShape: (id) =>
       commit((s) => ({ shapes: s.shapes.filter((sh) => sh.id !== id) })),
+
+    removeSelectionHighlights: (ranges) => commit(s => {
+      let changed = false
+      const shapes = s.shapes.flatMap(shape => {
+        if (!shape.wordRange || shape.type !== 'highlight') return [shape]
+        const pieces = subtractWordRanges(shape.wordRange, ranges)
+        if (pieces.length === 1 && pieces[0] === shape.wordRange) return [shape]
+        changed = true
+        return pieces.map((wordRange, index) => ({ ...shape, id: index ? uid('s') : shape.id, wordRange }))
+      })
+      return changed ? { shapes } : null
+    }),
+
+    highlightSelection: (regions, color, replaceIds = []) => {
+      const highlights = regions.map(({ range, ...bounds }) => ({
+        id: uid('s'), type: 'highlight', ...bounds, wordRange: range,
+        color, opacity: 0.3, tag: get().ui.noteTag,
+      }))
+      commit(s => ({ shapes: [...s.shapes.filter(shape => !replaceIds.includes(shape.id)), ...highlights],
+        ui: withTagVisible(s.ui, s.ui.noteTag) }))
+      return highlights.map(shape => shape.id)
+    },
+
+    addConnectedNote: (ranges, position) => {
+      const id = uid('n')
+      commit(s => ({
+        notes: [...s.notes, { id, title: '', text: '', tag: s.ui.noteTag,
+          panel: Object.keys(PANEL_TAG).find(panel => PANEL_TAG[panel] === s.ui.noteTag) || null,
+          verses: [...new Set(ranges.map(range => range.verse))], width: NOTE_WIDTH, ...position }],
+        connectors: [...s.connectors, ...ranges.map(range => ({ ...range, id: uid('c'), noteId: id, style: 'arrow' }))],
+        ui: withTagVisible(s.ui, s.ui.noteTag),
+      }))
+      set({ selectedId: id, editingId: id })
+      return id
+    },
 
     // --- notes ----------------------------------------------------------
     addNote: (note) => {

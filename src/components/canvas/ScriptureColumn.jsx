@@ -32,7 +32,7 @@ function ScriptureColumn({ layout, style, x, y, label, reference,
   const hover = useCallback((w, e) => {
     handlers.current.onWordHover?.(w)
     const container = e.target.getStage()?.container()
-    if (container) container.style.cursor = handlers.current.selectingWords ? 'text' : ''
+    if (container) container.style.cursor = 'text'
   }, [])
   const leave = useCallback(e => {
     const container = e.target.getStage()?.container()

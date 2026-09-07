@@ -17,6 +17,11 @@ npm run preview  # serve the built bundle
 **Split workspace.** 70% infinite canvas over a dot grid, 30% structured sidebar.
 Scroll to zoom at the cursor, shift-scroll to pan, hold space to drag the board.
 
+In Select mode, drag directly across scripture words to select a phrase or multiple
+verses. Release to copy the text, choose a highlight color, or create a connected
+sticky note. Ctrl/Cmd+C also copies the selection. Highlights follow the words
+when typography changes, and highlight and note actions can be undone.
+
 **The scripture layer.** Fetch any passage in modern translations (NIV, ESV,
 NASB, NKJV, NLT, AMP, MSG, RSV) or public-domain ones (WEB, KJV, ASV, YLT and
 more), or paste your own text. Flip on *Parallel* to set two translations side by

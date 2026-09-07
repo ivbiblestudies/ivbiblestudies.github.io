@@ -5,7 +5,7 @@ import LZString from 'lz-string'
 import { encodeState, readStateFromLocation, saveLocalDraft, readLocalDraft } from './urlState.js'
 
 test('legacy lookup and parallel studies retain their data through links, drafts and re-sharing', async () => {
-  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+  const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' })
   try {
     const { emptyDoc, hydrateDoc, pickDoc, useStudy } = await server.ssrLoadModule('/src/store.js')
     assert.equal('showStrongs' in emptyDoc().ui, false)
