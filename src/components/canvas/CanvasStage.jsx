@@ -75,6 +75,7 @@ export default function CanvasStage() {
   const connectors = useStudy((s) => s.connectors)
   const customTags = useStudy((s) => s.tags)
   const selectedId = useStudy((s) => s.selectedId)
+  const fitRequested = useStudy((s) => s.fitRequested)
 
   const setViewport = useStudy((s) => s.setViewport)
   const wheelUpdates = useMemo(() => frameUpdate((next) => {
@@ -237,6 +238,12 @@ export default function CanvasStage() {
     },
     [size, vp, setViewport],
   )
+
+  useEffect(() => {
+    if (!fitRequested || size.width <= 1 || size.height <= 1 || !columns.length) return
+    fitToContent(36)
+    useStudy.setState({ fitRequested: false })
+  }, [fitRequested, size, columns, fitToContent])
 
   // --- export ------------------------------------------------------------
   const renderImage = useCallback(

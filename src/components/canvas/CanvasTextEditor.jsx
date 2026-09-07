@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useStudy } from '../../store'
 import {
-  NOTE_PADDING,
-  NOTE_FONT_SIZE,
-  NOTE_TITLE_SIZE,
   NOTE_LINE_HEIGHT,
-  NOTE_HEADER,
+  noteFontMetrics,
   noteWidth,
   noteHeight,
 } from '../../lib/noteMetrics'
@@ -34,6 +31,32 @@ export default function CanvasTextEditor() {
   const [value, setValue] = useState('')
   const [title, setTitle] = useState('')
   const bodyRef = useRef(null)
+  const editorRef = useRef(null)
+  const [bounds, setBounds] = useState({ width: 1000, height: 700 })
+
+  useLayoutEffect(() => {
+    const parent = editorRef.current?.parentElement
+    if (!parent) return
+    const measure = () => setBounds({ width: parent.clientWidth, height: parent.clientHeight })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(parent)
+    return () => observer.disconnect()
+  }, [editingId, !!note])
+
+  // Measure the real DOM wrapping, including zoom, resized type and mobile CSS.
+  useLayoutEffect(() => {
+    const body = bodyRef.current
+    if (!body || !note) return
+    const resize = () => {
+      body.style.height = 'auto'
+      body.style.height = `${body.scrollHeight}px`
+    }
+    resize()
+    let active = true
+    document.fonts?.ready.then(() => { if (active) resize() })
+    return () => { active = false }
+  }, [value, title, editingId, note?.width, note?.fontScale, vp.scale, bounds.width])
 
   useEffect(() => {
     if (!target) return
@@ -104,21 +127,26 @@ export default function CanvasTextEditor() {
   const width = noteWidth(note)
   const tag = tagOf(note.tag)
   const scale = vp.scale
-  const innerWidth = (width - NOTE_PADDING * 2) * scale
+  const metrics = noteFontMetrics(note)
+  const maxHeight = Math.max(40, bounds.height - 24)
+  const editorHeight = Math.min(noteHeight({ ...note, title, text: value }) * scale, maxHeight)
+  const editorWidth = Math.min(width * scale, Math.max(40, bounds.width - 24))
 
   return (
     <div
-      className="absolute z-40 rounded-md border-2 border-stone-900/70 shadow-lg"
+      ref={editorRef}
+      className="absolute z-40 overflow-y-auto rounded-md border-2 border-stone-900/70 shadow-lg"
       style={{
-        left: vp.x + note.x * scale,
-        top: vp.y + note.y * scale,
-        width: width * scale,
-        minHeight: noteHeight({ ...note, title, text: value }) * scale,
+        left: Math.max(12, Math.min(vp.x + note.x * scale, bounds.width - editorWidth - 12)),
+        top: Math.max(12, Math.min(vp.y + note.y * scale, bounds.height - editorHeight - 12)),
+        width: editorWidth,
+        minHeight: editorHeight,
+        maxHeight,
         background: tag.soft,
-        paddingTop: (NOTE_HEADER + NOTE_PADDING - 8) * scale,
-        paddingLeft: NOTE_PADDING * scale,
-        paddingRight: NOTE_PADDING * scale,
-        paddingBottom: NOTE_PADDING * scale,
+        paddingTop: (metrics.header + metrics.padding - 8 * metrics.scale) * scale,
+        paddingLeft: metrics.padding * scale,
+        paddingRight: metrics.padding * scale,
+        paddingBottom: metrics.padding * scale,
       }}
       // Commit once focus leaves the whole editor, not when moving between the
       // title and the body.
@@ -140,8 +168,7 @@ export default function CanvasTextEditor() {
         placeholder="Title (optional)"
         className="block w-full bg-transparent font-semibold text-stone-900 outline-none placeholder:font-normal placeholder:text-stone-500/70"
         style={{
-          width: innerWidth,
-          fontSize: NOTE_TITLE_SIZE * scale,
+          fontSize: metrics.titleSize * scale,
           lineHeight: 1.3,
           fontFamily: 'Inter, sans-serif',
         }}
@@ -153,14 +180,13 @@ export default function CanvasTextEditor() {
         onKeyDown={onKeyDown}
         placeholder="Write your note…"
         rows={2}
-        className="block w-full resize-none bg-transparent text-stone-900 outline-none placeholder:text-stone-500/70"
+        className="block w-full resize-none overflow-hidden bg-transparent text-stone-900 outline-none placeholder:text-stone-500/70"
         style={{
-          width: innerWidth,
-          marginTop: 4 * scale,
-          fontSize: NOTE_FONT_SIZE * scale,
+          marginTop: metrics.titleGap * scale,
+          fontSize: metrics.bodySize * scale,
           lineHeight: NOTE_LINE_HEIGHT,
           fontFamily: 'Inter, sans-serif',
-          minHeight: NOTE_FONT_SIZE * NOTE_LINE_HEIGHT * 2 * scale,
+          minHeight: metrics.bodySize * NOTE_LINE_HEIGHT * 2 * scale,
         }}
         spellCheck
       />

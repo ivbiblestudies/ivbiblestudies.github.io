@@ -9,6 +9,7 @@ import ExportModal from './components/ExportModal'
 import ShareModal from './components/ShareModal'
 import { cx } from './components/ui'
 import MovablePanel from './components/MovablePanel'
+import { starterStudy } from './lib/starterStudy'
 
 const TOOL_KEYS = {
   v: 'select',
@@ -113,7 +114,18 @@ export default function App() {
       const draft = shared || readLocalDraft()
       if (draft) loadDoc(draft, { shared: !!shared })
       const primary = useStudy.getState().scripture.primary
-      if (primary.mode === 'api' && !primary.verses?.length) loadPassage('primary')
+      if (primary.mode === 'api' && !primary.verses?.length) {
+        loadPassage('primary').then(async loaded => {
+          if (!loaded || draft || hadSharedPayload || cancelled) return
+          await document.fonts?.ready
+          const state = useStudy.getState()
+          if (cancelled || state.title !== 'Untitled study' || state.scripture.reference !== 'Luke 7:1-10' ||
+            state.notes.length || state.shapes.length || state.tags.length || state.connectors.length ||
+            Object.values(state.panels).some(Boolean)) return
+          loadDoc(starterStudy(pickDoc(state)))
+          useStudy.setState({ fitRequested: true })
+        })
+      }
       clearLocationState()
       if (hadSharedPayload && !shared) {
         useStudy.getState().setNotice('The shared link could not be opened. Your local draft was kept. Try the link in a current browser.')
