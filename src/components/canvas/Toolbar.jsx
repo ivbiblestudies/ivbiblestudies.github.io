@@ -16,13 +16,17 @@ import {
   IconNote,
 } from '../icons'
 
-const TOOLS = [
-  { id: 'select', label: 'Select / move', key: 'V', Icon: IconCursor },
+const SHAPES = [
   { id: 'box', label: 'Draw box', key: 'B', Icon: IconBox },
   { id: 'circle', label: 'Draw circle', key: 'C', Icon: IconCircle },
   { id: 'ellipse', label: 'Draw ellipse', key: 'E', Icon: IconEllipse },
   { id: 'triangle', label: 'Draw triangle', key: 'R', Icon: IconTriangle },
   { id: 'diamond', label: 'Draw diamond', key: 'D', Icon: IconDiamond },
+]
+
+const TOOLS = [
+  { id: 'select', label: 'Select / move', key: 'V', Icon: IconCursor },
+  { id: 'shapes', label: 'Shapes', Icon: IconBox },
   { id: 'highlight', label: 'Highlighter', key: 'G', Icon: IconHighlighter },
   { id: 'arrow', label: 'Arrow', key: 'A', Icon: IconArrow },
   { id: 'text', label: 'Add text', key: 'T', Icon: IconText },
@@ -46,7 +50,7 @@ function Flyout({ open, onClose, children, label }) {
   useEffect(() => {
     if (!open) return
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose()
+      if (ref.current && !ref.current.parentElement.contains(e.target)) onClose()
     }
     const onKey = (e) => e.key === 'Escape' && onClose()
     document.addEventListener('pointerdown', onDown)
@@ -85,7 +89,10 @@ export default function Toolbar() {
   const addTag = useStudy((s) => s.addTag)
   const removeTag = useStudy((s) => s.removeTag)
 
-  const [menu, setMenu] = useState(null) // 'tag' | 'color' | null
+  const [menu, setMenu] = useState(null) // 'shapes' | 'tag' | 'color' | null
+  const shapesButton = useRef(null)
+  const activeShape = SHAPES.find(shape => shape.id === tool)
+  const ShapeIcon = activeShape?.Icon || IconBox
   const [newTag, setNewTag] = useState(null) // { label, hex } while creating
   const tags = tagList(customTags)
   const activeTag = resolveTag(noteTag, customTags)
@@ -93,7 +100,40 @@ export default function Toolbar() {
   return (
     <MovablePanel label="Tools" hidden={hidden} width={58} onHide={() => setUI({ toolsHidden: true }, { history: false })}>
       <div className="pointer-events-auto relative flex flex-col items-center gap-1 rounded-2xl border border-stone-200/90 bg-white/95 p-1.5 shadow-xl shadow-stone-900/10 backdrop-blur">
-        {TOOLS.map(({ id, label, key, Icon }) => (
+        {TOOLS.map(({ id, label, key, Icon }) => id === 'shapes' ? (
+          <div key={id} className="relative">
+            <button ref={shapesButton} type="button" title="Shapes" aria-label="Shapes"
+              aria-expanded={menu === 'shapes'} aria-controls="shape-picker"
+              onClick={() => setMenu(menu === 'shapes' ? null : 'shapes')}
+              className={cx('relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors',
+                activeShape ? 'bg-stone-900 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900')}>
+              <ShapeIcon />
+              <span aria-hidden="true" className="absolute bottom-0 right-1 text-[9px]">▾</span>
+            </button>
+            <Flyout open={menu === 'shapes'} onClose={() => setMenu(null)} label="Choose a shape">
+              <div id="shape-picker" role="group" aria-label="Shapes" className="w-44"
+                onKeyDown={event => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation()
+                    setMenu(null)
+                    shapesButton.current?.focus()
+                  }
+                }}>
+                <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">Shapes</div>
+                {SHAPES.map(({ id: shapeId, label: shapeLabel, key: shortcut, Icon: ChoiceIcon }, index) => (
+                  <button key={shapeId} type="button" autoFocus={index === 0}
+                    aria-pressed={tool === shapeId} title={`${shapeLabel} (${shortcut})`}
+                    onClick={() => { setTool(shapeId); setMenu(null); shapesButton.current?.focus() }}
+                    className={cx('flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm',
+                      tool === shapeId ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100')}>
+                    <ChoiceIcon /><span>{shapeLabel.replace('Draw ', '')}</span>
+                    <span className="ml-auto text-xs opacity-60">{shortcut}</span>
+                  </button>
+                ))}
+              </div>
+            </Flyout>
+          </div>
+        ) : (
           <button
             key={id}
             type="button"
