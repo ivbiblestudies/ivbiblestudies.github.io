@@ -1,26 +1,26 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { Group, Rect, Text } from 'react-konva'
 import { resolveTag } from '../../data/tags'
 import {
-  NOTE_MIN_WIDTH,
-  NOTE_MAX_WIDTH,
   NOTE_LINE_HEIGHT,
   NOTE_TITLE_LINE_HEIGHT,
-  MIN_SCALE,
-  MAX_SCALE,
   noteWidth,
   noteHeight,
-  noteScale,
   noteFontMetrics,
   noteTitleLines,
   noteBodyLines,
-  noteContentHeight,
 } from '../../lib/noteMetrics'
 import { verseLabel } from '../../lib/quickEntry'
 
+import { resizeNoteBox } from '../../lib/noteResize'
+
 const HANDLE = 9
 
-const CORNERS = [
+const HANDLES = [
+  { key: 'l', ax: 0, ay: 0.5, cursor: 'ew-resize' },
+  { key: 'r', ax: 1, ay: 0.5, cursor: 'ew-resize' },
+  { key: 't', ax: 0.5, ay: 0, cursor: 'ns-resize' },
+  { key: 'b', ax: 0.5, ay: 1, cursor: 'ns-resize' },
   { key: 'tl', ax: 0, ay: 0, cursor: 'nwse-resize' },
   { key: 'tr', ax: 1, ay: 0, cursor: 'nesw-resize' },
   { key: 'bl', ax: 0, ay: 1, cursor: 'nesw-resize' },
@@ -62,41 +62,21 @@ function NoteNode({
   const label = verseLabel(note.verses)
   const bodyTop = m.header + m.padding - 4 * m.scale + titleBlock
 
-  /**
-   * Turn a dragged corner into a new box. The corner opposite the one being
-   * dragged stays pinned, the type scales with the box, and the note can never
-   * be squeezed smaller than the text inside it.
-   */
+  const resizeStart = useRef(null)
+
   const emitResize = (handle, ax, ay, done) => {
-    const hx = handle.x() + HANDLE / 2
-    const hy = handle.y() + HANDLE / 2
-
-    // Edges in the note's local space; the dragged corner moves, the other stays.
-    const left = ax === 0 ? hx : 0
-    const right = ax === 0 ? width : hx
-    const top = ay === 0 ? hy : 0
-    const bottom = ay === 0 ? height : hy
-
-    const w = Math.min(NOTE_MAX_WIDTH, Math.max(NOTE_MIN_WIDTH, right - left))
-    // Type scales with the box, the way a text frame scales in a drawing tool.
-    const fontScale = Math.min(
-      MAX_SCALE,
-      Math.max(MIN_SCALE, noteScale(note) * (w / width)),
-    )
-    const next = { ...note, width: w, fontScale }
-    const h = Math.max(noteContentHeight(next), bottom - top)
-
-    // Re-derive the origin from the pinned edge so a clamp doesn't drag the
-    // whole note along with it.
-    const x = ax === 0 ? note.x + right - w : note.x
-    const y = ay === 0 ? note.y + bottom - h : note.y
-
-    // Konva owns this node's position while dragging; if the clamp bit, the
-    // handle would sit away from the corner it represents until some other
-    // prop changed. Put it back on the corner every frame.
-    handle.position({ x: ax * w - HANDLE / 2, y: ay * h - HANDLE / 2 })
-
-    onResize?.(note.id, { x, y, width: w, height: h, fontScale }, done)
+    const start = resizeStart.current || note
+    // Convert from the moving group's coordinates to the original note box.
+    const group = handle.getParent()
+    const hx = group.x() + handle.x() + HANDLE / 2 - start.x
+    const hy = group.y() + handle.y() + HANDLE / 2 - start.y
+    const box = resizeNoteBox(start, ax, ay, hx, hy)
+    handle.position({
+      x: box.x - group.x() + ax * box.width - HANDLE / 2,
+      y: box.y - group.y() + ay * box.height - HANDLE / 2,
+    })
+    onResize?.(note.id, box, done)
+    if (done) resizeStart.current = null
   }
 
   return (
@@ -189,7 +169,7 @@ function NoteNode({
       />
 
       {selected &&
-        CORNERS.map(({ key, ax, ay, cursor }) => (
+        HANDLES.map(({ key, ax, ay, cursor }) => (
           <Rect
             key={key}
             x={ax * width - HANDLE / 2}
@@ -203,6 +183,7 @@ function NoteNode({
             draggable
             hitStrokeWidth={10}
             onDragStart={(e) => {
+              resizeStart.current = { ...note }
               e.cancelBubble = true
             }}
             onDragMove={(e) => {

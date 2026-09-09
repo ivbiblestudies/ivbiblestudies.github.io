@@ -611,7 +611,7 @@ export default function CanvasStage() {
   }, [])
 
   /**
-   * Persist a note resize. Notes carry their own corner handles rather than the
+   * Persist a note resize. Notes carry their own resize handles rather than the
    * Transformer: a note's height is derived from its wrapped text, and mutating
    * that mid-transform fights the Transformer's own drag bookkeeping. The handle
    * hands us an already-clamped box; only the last frame becomes an undo step.

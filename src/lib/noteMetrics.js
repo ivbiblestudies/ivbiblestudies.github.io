@@ -2,8 +2,8 @@
 // placement logic in the store, so a note always reserves exactly the space it
 // will occupy.
 //
-// A note carries a `fontScale`: resizing it scales the type with the box, the
-// way a text frame scales in a drawing tool, rather than only re-wrapping.
+// A note carries a `fontScale`: corner resizing scales the type with the box;
+// edge resizing preserves that scale. Only width changes re-wrap the text.
 
 export const NOTE_WIDTH = 190
 export const NOTE_MIN_WIDTH = 130
