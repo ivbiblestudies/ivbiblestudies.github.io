@@ -102,6 +102,7 @@ export default function CanvasStage() {
     updateNote(id, { x, y })
   }, [noteDragUpdates, updateNote])
   const setConnectorRange = useStudy((s) => s.setConnectorRange)
+  const changeNoteVerse = useStudy((s) => s.changeNoteVerse)
 
   const vp = ui.viewport
   const tool = ui.tool
@@ -675,6 +676,13 @@ export default function CanvasStage() {
     evt.cancelBubble = true
     if (panRef.current?.spaceHeld) return
     if (wordSelection) {
+      if (wordSelection.mode === 'verse') {
+        changeNoteVerse(wordSelection.noteId, {
+          verse: word.verse, verseIndex: word.verseIndex, column: colIndex,
+        })
+        setWordSelection(null)
+        return
+      }
       const range = wordSelection.range
       if (range && range.column === colIndex && range.verseIndex === word.verseIndex) {
         setConnectorRange(wordSelection.noteId, {
@@ -996,10 +1004,14 @@ export default function CanvasStage() {
         setTool('select')
         panRef.current = null
         setWordSelection({ noteId, range: null })
+      }} onChangeVerse={(noteId) => {
+        setTool('select')
+        panRef.current = null
+        setWordSelection({ noteId, range: null, mode: 'verse' })
       }} />}
       {wordSelection && (
         <div role="status" className="absolute left-1/2 top-4 z-30 flex max-w-[90%] -translate-x-1/2 items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 text-xs shadow-lg">
-          <span>{previewRange ? 'Click the last word in the same verse, or save this selection.' : 'Click the first word of the phrase to connect to this note.'}</span>
+          <span>{wordSelection.mode === 'verse' ? 'Click any word in the replacement verse. This replaces the note’s existing connections.' : previewRange ? 'Click the last word in the same verse, or save this selection.' : 'Click the first word of the phrase to connect to this note.'}</span>
           {previewRange && <button type="button" className="rounded-lg bg-stone-900 px-3 py-2 font-semibold whitespace-nowrap text-white" onClick={() => {
             setConnectorRange(wordSelection.noteId, { ...previewRange, startWord: Math.min(previewRange.startWord, previewRange.endWord), endWord: Math.max(previewRange.startWord, previewRange.endWord) })
             setWordSelection(null)

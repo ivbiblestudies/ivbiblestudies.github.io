@@ -3,6 +3,36 @@ import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { encodeState, decodeState } from './urlState.js'
 
+test('note highlights clear independently and changing verse replaces connections with undo', async () => {
+  const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' })
+  try {
+    const { useStudy } = await server.ssrLoadModule('/src/store.js')
+    const first = { verse: 1, verseIndex: 0, column: 0, startWord: 0, endWord: 2 }
+    const id = useStudy.getState().addConnectedNote([first], { x: 0, y: 0 })
+    const other = useStudy.getState().addConnectedNote([first], { x: 100, y: 0 })
+    useStudy.getState().setConnectorStyle(id, 'highlight')
+    useStudy.getState().setConnectorRange(id, { ...first, startWord: 4, endWord: 5 })
+    const before = useStudy.getState().connectors
+    useStudy.getState().removeNoteHighlights(id)
+    assert.deepEqual(useStudy.getState().connectors, before.filter(c => c.noteId === other))
+    assert.deepEqual(useStudy.getState().notes.find(n => n.id === id).verses, [1])
+    useStudy.getState().undo()
+    assert.deepEqual(useStudy.getState().connectors, before)
+    useStudy.getState().changeNoteVerse(id, { verse: 3, verseIndex: 2, column: 1 })
+    assert.deepEqual(useStudy.getState().notes.find(n => n.id === id).verses, [3])
+    const links = useStudy.getState().connectors.filter(c => c.noteId === id)
+    assert.equal(links.length, 1)
+    assert.equal(links[0].verse, 3)
+    assert.equal(links[0].column, 1)
+    assert.equal(links[0].startWord, undefined)
+    assert.equal(links[0].style, 'highlight')
+    assert.deepEqual(useStudy.getState().connectors.filter(c => c.noteId === other), before.filter(c => c.noteId === other))
+    useStudy.getState().undo()
+    assert.deepEqual(useStudy.getState().connectors, before)
+    assert.deepEqual(useStudy.getState().notes.find(n => n.id === id).verses, [1])
+  } finally { await server.close() }
+})
+
 test('selection highlights recolor without stacking and connected notes undo atomically', async () => {
   const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' })
   try {

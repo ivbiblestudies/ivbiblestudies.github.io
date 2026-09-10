@@ -428,6 +428,23 @@ export const useStudy = create((set, get) => {
         ),
       })),
 
+    removeNoteHighlights: (noteId) =>
+      commit((s) => {
+        const connectors = s.connectors.filter((c) => c.noteId !== noteId || c.style !== 'highlight')
+        return connectors.length === s.connectors.length ? null : { connectors }
+      }),
+
+    changeNoteVerse: (noteId, { verse, verseIndex, column }) =>
+      commit((s) => {
+        if (!s.notes.some((n) => n.id === noteId)) return null
+        const style = s.connectors.find((c) => c.noteId === noteId)?.style || 'arrow'
+        return {
+          notes: s.notes.map((n) => n.id === noteId ? { ...n, verses: [verse] } : n),
+          connectors: [...s.connectors.filter((c) => c.noteId !== noteId),
+            { id: uid('c'), noteId, verse, verseIndex, column, style }],
+        }
+      }),
+
     /** Add another phrase, replacing only the initial whole-verse target. */
     setConnectorRange: (noteId, range) =>
       commit((s) => {

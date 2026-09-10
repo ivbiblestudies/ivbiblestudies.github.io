@@ -9,7 +9,7 @@ const PANEL_FOR_TAG = Object.fromEntries(
 )
 
 /** Retag, recolor or delete the selected canvas object. */
-export default function SelectionPopover({ bounds, onSelectWords }) {
+export default function SelectionPopover({ bounds, onSelectWords, onChangeVerse }) {
   const selectedId = useStudy((s) => s.selectedId)
   const editingId = useStudy((s) => s.editingId)
   const notes = useStudy((s) => s.notes)
@@ -22,6 +22,7 @@ export default function SelectionPopover({ bounds, onSelectWords }) {
   const customTags = useStudy((s) => s.tags)
   const connectors = useStudy((s) => s.connectors)
   const setConnectorStyle = useStudy((s) => s.setConnectorStyle)
+  const removeNoteHighlights = useStudy((s) => s.removeNoteHighlights)
 
   const note = notes.find((n) => n.id === selectedId)
   const shape = shapes.find((s) => s.id === selectedId)
@@ -33,7 +34,7 @@ export default function SelectionPopover({ bounds, onSelectWords }) {
   const width = note ? note.width || NOTE_WIDTH : shape.width || 180
   // The bar grows with the number of tags and the link toggle, so keep a
   // generous right margin or it clips against the sidebar.
-  const barWidth = 220 + tagList(customTags).length * 52 + (note ? 220 : 0)
+  const barWidth = Math.min(220 + tagList(customTags).length * 52 + (note ? 480 : 0), (bounds?.width || 900) - 24)
   const left = Math.max(
     8,
     Math.min(
@@ -50,8 +51,8 @@ export default function SelectionPopover({ bounds, onSelectWords }) {
 
   return (
     <div
-      className="animate-fade-in absolute z-30 flex items-center gap-1 rounded-xl border border-stone-200 bg-white/95 p-1 shadow-lg shadow-stone-900/10 backdrop-blur"
-      style={{ left, top }}
+      className="animate-fade-in absolute z-30 flex flex-wrap items-center gap-1 rounded-xl border border-stone-200 bg-white/95 p-1 shadow-lg shadow-stone-900/10 backdrop-blur"
+      style={{ left, top, maxWidth: barWidth }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {tagList(customTags).map((t) => {
@@ -110,14 +111,33 @@ export default function SelectionPopover({ bounds, onSelectWords }) {
       )}
 
       {note && (
-        <button
-          type="button"
-          title="Add another highlighted phrase connected to this note"
-          onClick={() => onSelectWords(note.id)}
-          className="h-7 whitespace-nowrap rounded-lg px-2 text-[11px] font-semibold text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-        >
-          Add highlight
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => onChangeVerse(note.id)}
+            title="Select a replacement verse for this note"
+            className="h-7 whitespace-nowrap rounded-lg px-2 text-[11px] font-semibold text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+          >
+            Change tagged verse
+          </button>
+          <button
+            type="button"
+            onClick={() => removeNoteHighlights(note.id)}
+            disabled={!linked.some((c) => c.style === 'highlight')}
+            title="Remove all highlights connected to this note"
+            className="h-7 whitespace-nowrap rounded-lg px-2 text-[11px] font-semibold text-stone-500 hover:bg-stone-100 hover:text-stone-900 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Remove all highlights
+          </button>
+          <button
+            type="button"
+            title="Add another highlighted phrase connected to this note"
+            onClick={() => onSelectWords(note.id)}
+            className="h-7 whitespace-nowrap rounded-lg px-2 text-[11px] font-semibold text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+          >
+            Add highlight
+          </button>
+          </>
       )}
 
       {(note || shape.type === 'text') && (
