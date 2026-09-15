@@ -182,6 +182,15 @@ src/
 
 Two design decisions worth knowing about:
 
+**Whiteboard JSON workflow.** Press **Alt+Shift+A** to reveal **JSON tools**.
+Use **Copy whiteboard prompt** with a whiteboard photo in your preferred LLM,
+then paste its JSON response or choose its `.json` file. Import replaces the
+study as one undoable action; **Export JSON** saves the current document.
+The prompt includes the versioned format and an example, and can be expanded
+for manual copying. Invalid documents show an error without changing the study.
+Press the shortcut again to hide the controls. Their visibility lasts only for
+the current session and is never included in shared JSON or browser drafts.
+
 **Words are laid out by hand.** Konva can wrap a paragraph, but then no word has
 an identity — you couldn't select a phrase or point an arrow at verse 3.
 So `textLayout.js` measures each word with a 2D context using the exact font

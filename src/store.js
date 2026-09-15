@@ -170,6 +170,12 @@ export const useStudy = create((set, get) => {
 
     resetDoc: () => set({ ...emptyDoc(), past: [], future: [], selectedId: null }),
 
+    // The JSON dialog supplies a validated document. Import is one undo step.
+    importDoc: (doc) => {
+      commit(() => pickDoc(hydrateDoc(doc)))
+      set({ selectedId: null, editingId: null, sharedLoad: false, error: null })
+    },
+
     undo: () =>
       set((state) => {
         if (!state.past.length) return {}

@@ -7,6 +7,7 @@ import TopBar from './components/TopBar'
 import SettingsModal from './components/SettingsModal'
 import ExportModal from './components/ExportModal'
 import ShareModal from './components/ShareModal'
+import StudyJsonTools from './components/StudyJsonTools'
 import { cx } from './components/ui'
 import MovablePanel from './components/MovablePanel'
 import { starterStudy } from './lib/starterStudy'
@@ -163,7 +164,7 @@ export default function App() {
         redo()
         return
       }
-      if (typing || mod) return
+      if (typing || mod || e.altKey) return
 
       if (e.key === 'Escape') {
         setSelected(null)
@@ -188,6 +189,7 @@ export default function App() {
       <TopBar />
       <div className="flex shrink-0 items-center justify-between border-b border-stone-200 bg-white px-3 py-1">
         <button type="button" aria-expanded={!toolsHidden} className="rounded px-2 py-1 text-xs text-stone-600 hover:bg-stone-100" onClick={() => setUI({ toolsHidden: !toolsHidden }, { history: false })}>{toolsHidden ? 'Show tools' : 'Hide tools'}</button>
+        <StudyJsonTools />
         <button type="button" aria-expanded={!studyHidden} className="rounded px-2 py-1 text-xs text-stone-600 hover:bg-stone-100" onClick={() => setUI({ studyHidden: !studyHidden }, { history: false })}>{studyHidden ? 'Show study panel' : 'Hide study panel'}</button>
       </div>
 
