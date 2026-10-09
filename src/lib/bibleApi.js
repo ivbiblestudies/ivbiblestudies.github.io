@@ -1,8 +1,9 @@
-// Passage loading. Everything here runs in the browser against keyless,
-// CORS-enabled endpoints; there is no backend and no API key anywhere.
+// Passage loading in the browser: local NIV books and keyless, CORS-enabled
+// endpoints for other translations. There is no backend or API key.
 
 import { findTranslation, translationName } from '../data/translations'
 import { fetchBollsPassage, BollsError } from './bolls'
+import { fetchNivPassage, NivError } from './niv'
 
 const ENDPOINT = 'https://bible-api.com/'
 
@@ -73,9 +74,11 @@ export async function fetchPassage(reference, translation) {
 
   try {
     const result =
-      source === 'bolls'
-        ? await fetchBollsPassage(ref, translation)
-        : await fetchFromBibleApi(ref, translation)
+      source === 'niv-local'
+        ? await fetchNivPassage(ref)
+        : source === 'bolls'
+          ? await fetchBollsPassage(ref, translation)
+          : await fetchFromBibleApi(ref, translation)
 
     return {
       reference: result.reference,
@@ -85,7 +88,7 @@ export async function fetchPassage(reference, translation) {
     }
   } catch (err) {
     // Present one error type upward, whichever provider failed.
-    if (err instanceof BollsError) throw new BibleApiError(err.message)
+    if (err instanceof BollsError || err instanceof NivError) throw new BibleApiError(err.message)
     throw err
   }
 }

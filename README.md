@@ -131,20 +131,21 @@ including Firefox.
 
 ## Passage sources
 
-Both providers are keyless and CORS-enabled, which is what lets this stay a static
-page with nothing to hide a secret in.
+NIV uses the supplied local JSON books. The other two providers are keyless and
+CORS-enabled, keeping this a static page with no API secrets.
 
 | Source | Translations |
 |---|---|
 | [bible-api.com](https://bible-api.com) | public domain: WEB, KJV, ASV, BBE, YLT, DRA, OEB, Vulgate, Almeida |
-| [bolls.life](https://bolls.life) | modern: NIV, ESV, NASB, NKJV, NLT, AMP, MSG, RSV |
+| Local `niv/` JSON files | NIV |
+| [bolls.life](https://bolls.life) | modern: ESV, NASB, NKJV, NLT, AMP, MSG, RSV |
 
-Modern translations are under copyright and are fetched from a third-party public
-API for personal study; the app neither hosts nor redistributes them. If you'd
-rather work from your own licensed copy, every column has a **Paste text** mode
-that keeps the text entirely on your machine.
+NIV books are bundled as separate files and loaded on demand, without an external
+Bible API. Chapter and verse numbers in the JSON are converted from strings; empty
+verse entries are skipped without renumbering the remaining text. Other modern
+translations are fetched from bolls.life. Every column also has a **Paste text** mode.
 
-Reference parsing for the bolls source is local (`src/data/books.js`) and handles
+Reference parsing for NIV and the bolls source is local (`src/data/books.js`) and handles
 `John 3`, `John 3:16`, `John 3:16-18`, `John 3-4`, `John 3:16-4:2`, `1 Cor 13`,
 `Ps 23`, and common abbreviations.
 
@@ -173,6 +174,7 @@ src/
     noteMetrics.js        sticky-note wrapping, sizing and resize floors
     bibleApi.js           provider router + bible-api.com client + paste parser
     bolls.js              bolls.life client for modern translations
+    niv.js                local NIV JSON loader and passage selection
     urlState.js           native gzip/Base64URL, legacy decoding, local drafts
     exporters.js          PNG and PDF output
   data/

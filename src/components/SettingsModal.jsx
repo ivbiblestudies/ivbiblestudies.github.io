@@ -67,7 +67,9 @@ function SlotEditor({ slot, title, description }) {
           </Button>
         </div>
         <p className="mt-2 text-[11px] leading-snug text-stone-500">
-          {findTranslation(config.translation)?.source === 'bolls'
+          {findTranslation(config.translation)?.source === 'niv-local'
+            ? 'NIV text is included with the app.'
+            : findTranslation(config.translation)?.source === 'bolls'
             ? 'Modern translations are fetched from bolls.life, a keyless public API. They remain under copyright — use “Paste text” if you would rather supply your own licensed copy.'
             : 'Public-domain text from bible-api.com.'}
         </p>

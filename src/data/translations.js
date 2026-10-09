@@ -1,18 +1,17 @@
-// Every translation the app can fetch, and which keyless API serves it.
+// Every translation the app can load, and its text source.
 //
 //  - `bible-api`  bible-api.com — public domain texts, parses references itself
+//  - `niv-local`  supplied NIV JSON books, loaded one book at a time
 //  - `bolls`      bolls.life — modern translations, chapter at a time
 //
-// Neither needs an API key or a backend, which is what keeps this app a static
-// page. Modern translations are under copyright and are fetched from a third
-// party for personal study; use the "Paste text" mode if you'd rather supply
-// them from your own licensed copy.
+// No source needs an API key or a backend, keeping this app a static page.
+// NIV is bundled locally; other modern translations come from a third party.
 
 const T = (id, name, short, source, group) => ({ id, name, short, source, group })
 
 export const TRANSLATIONS = [
-  // Modern, copyrighted — via bolls.life
-  T('NIV', 'New International Version', 'NIV', 'bolls', 'Modern'),
+  // Modern translations — NIV locally, the others via bolls.life
+  T('NIV', 'New International Version', 'NIV', 'niv-local', 'Modern'),
   T('ESV', 'English Standard Version', 'ESV', 'bolls', 'Modern'),
   T('NASB', 'New American Standard Bible', 'NASB', 'bolls', 'Modern'),
   T('NKJV', 'New King James Version', 'NKJV', 'bolls', 'Modern'),

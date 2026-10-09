@@ -1,6 +1,6 @@
 // Second passage provider: bolls.life.
 //
-// bible-api.com only carries public-domain texts, so NIV, ESV, NASB and friends
+// bible-api.com only carries public-domain texts, so ESV, NASB and friends
 // need another source. bolls.life exposes a keyless, CORS-enabled JSON endpoint
 // per chapter, which is the only shape of API that can work from a static page
 // with no backend to hide a key in.
@@ -69,7 +69,7 @@ async function fetchChapter(translation, bookId, chapter) {
 
 /**
  * @param {string} reference e.g. "John 3:16-18", "Romans 8", "1 Cor 13:1-13"
- * @param {string} translation a bolls translation key (NIV, ESV, NASB, ...)
+ * @param {string} translation a bolls translation key (ESV, NASB, ...)
  */
 export async function fetchBollsPassage(reference, translation) {
   const parsed = parseReference(reference)
